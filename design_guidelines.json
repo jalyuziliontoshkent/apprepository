@@ -1,0 +1,135 @@
+{
+  "theme_and_archetype": {
+    "domain": "Premium B2B Order Management",
+    "theme": "DARK",
+    "archetype": "5 (Jewel & Luxury - Monochrome Liquid Glass Variant)",
+    "rationale": "The app demands a 'Liquid Glass' aesthetic in strict Black & White. To maintain premium contrast without color, we rely on depth (opacity layers), frosted glassmorphism (heavy blur + low opacity white), and stark typographic contrast."
+  },
+  "color_palette": {
+    "background": {
+      "base": "#050505",
+      "surface": "#0a0a0a",
+      "texture": "Add subtle grain/noise via CSS to prevent banding and increase tactile feel."
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "rgba(255, 255, 255, 0.6)",
+      "muted": "rgba(255, 255, 255, 0.3)",
+      "inverse": "#000000"
+    },
+    "glass_surfaces": {
+      "heavy": "bg-white/[0.08] backdrop-blur-2xl border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]",
+      "medium": "bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]",
+      "light": "bg-white/[0.02] backdrop-blur-lg border border-white/[0.04]",
+      "active": "bg-white/[0.12] backdrop-blur-2xl border border-white/20"
+    },
+    "actions": {
+      "primary": "bg-white text-black hover:bg-neutral-200",
+      "secondary": "bg-white/10 text-white border border-white/20 hover:bg-white/20",
+      "destructive": "bg-neutral-800 text-white border border-neutral-600 hover:bg-neutral-700"
+    }
+  },
+  "typography": {
+    "banned_fonts": ["Inter", "Roboto", "Open Sans", "Space Grotesk"],
+    "families": {
+      "heading": "'Manrope', sans-serif",
+      "body": "'IBM Plex Sans', sans-serif",
+      "mono_data": "'JetBrains Mono', monospace"
+    },
+    "scales": {
+      "h1": "text-4xl md:text-5xl font-light tracking-tighter text-white",
+      "h2": "text-2xl md:text-3xl font-medium tracking-tight text-white",
+      "h3": "text-xl font-medium tracking-tight text-white/90",
+      "h4": "text-lg font-medium text-white/80",
+      "body_large": "text-base font-normal text-white/70 leading-relaxed",
+      "body": "text-sm font-normal text-white/60 leading-relaxed",
+      "caption": "text-xs font-medium tracking-[0.1em] uppercase text-white/40",
+      "metric": "text-4xl font-mono text-white tracking-tight"
+    }
+  },
+  "spacing_and_layout": {
+    "philosophy": "Generous Spacing, Mobile-First Web Application",
+    "container": "w-full max-w-[480px] mx-auto min-h-screen relative overflow-hidden bg-[#050505]",
+    "padding_scale": {
+      "screen": "p-6",
+      "card": "p-6 md:p-8",
+      "list_item": "py-4 px-5",
+      "gap": "gap-4 md:gap-6"
+    },
+    "grid_modes": {
+      "dashboard_stats": "grid grid-cols-2 gap-4",
+      "form_calculator": "grid grid-cols-2 gap-4 items-end"
+    },
+    "border_radius": {
+      "card": "rounded-3xl",
+      "button": "rounded-full",
+      "input": "rounded-2xl",
+      "bubble": "rounded-2xl"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "h-14 w-full rounded-full bg-white text-black font-semibold text-base flex items-center justify-center transition-transform active:scale-[0.98]",
+      "fab": "fixed bottom-24 right-6 h-16 w-16 rounded-full bg-white text-black shadow-[0_0_30px_rgba(255,255,255,0.3)] flex items-center justify-center z-50"
+    },
+    "inputs": {
+      "default": "h-14 w-full bg-black/50 backdrop-blur-md border border-white/20 rounded-2xl px-5 text-white placeholder:text-white/30 focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/50 transition-all text-base",
+      "calculator": "h-20 w-full bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-2xl px-6 text-2xl font-mono text-white text-center focus:border-white/40 placeholder:text-white/20 transition-all"
+    },
+    "cards": {
+      "stat": "bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-3xl p-6 flex flex-col justify-between aspect-square relative overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-br before:from-white/5 before:to-transparent before:pointer-events-none",
+      "order": "bg-white/[0.02] border border-white/5 rounded-3xl p-5 mb-4 active:bg-white/[0.05] transition-colors"
+    },
+    "navigation": {
+      "bottom_dock": "fixed bottom-0 inset-x-0 h-20 bg-[#050505]/80 backdrop-blur-2xl border-t border-white/10 flex justify-around items-center px-6 pb-safe z-40 max-w-[480px] mx-auto",
+      "header_glass": "sticky top-0 z-40 w-full bg-[#050505]/70 backdrop-blur-2xl border-b border-white/5 pt-safe h-16 flex items-center justify-between px-6"
+    },
+    "chat": {
+      "bubble_received": "self-start bg-white/[0.06] backdrop-blur-md border border-white/10 text-white rounded-2xl rounded-tl-none py-3 px-4 max-w-[80%]",
+      "bubble_sent": "self-end bg-white text-black rounded-2xl rounded-tr-none py-3 px-4 max-w-[80%]",
+      "input_area": "sticky bottom-0 w-full bg-[#050505]/90 backdrop-blur-2xl border-t border-white/10 p-4 pt-4 pb-safe flex gap-3 items-end"
+    }
+  },
+  "interactive_states": {
+    "hover_active": "Always explicitly define hover/active. Active (mobile) should use scale-[0.98] and slight brightness increase.",
+    "focus": "Inputs must have focus:border-white/50 and text-white to remain accessible against dark bg.",
+    "data_testid": "Apply data-testid to every interactive element (e.g., 'login-submit-button', 'calc-width-input', 'order-card-123')."
+  },
+  "motion_and_effects": {
+    "transitions": "transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1)",
+    "page_load": "Staggered fade-up for list items (Framer Motion: initial opacity 0, y 10).",
+    "glass_reflection": "Use a subtle inset shadow on heavy glass cards to simulate edge thickness: shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]"
+  },
+  "media": {
+    "images": [
+      {
+        "category": "login_background",
+        "url": "https://static.prod-images.emergentagent.com/jobs/f315529b-cdd9-4734-9d45-3cdd0c03f171/images/bd3a48a86df01b2bd113325a4a18a174e2df95010aee1bfeab877644392d1f2c.png",
+        "description": "Abstract black and white flowing silk fabric mimicking liquid glass, ultra premium, deep black background.",
+        "usage": "Use as full-screen absolute background on the Login screen, behind a heavy glass card."
+      },
+      {
+        "category": "empty_state_orders",
+        "url": "https://static.prod-images.emergentagent.com/jobs/f315529b-cdd9-4734-9d45-3cdd0c03f171/images/c823a179b1649e7da1102b11873e5065b9241436988e1f62ea378bb2a5db0331.png",
+        "description": "Minimalist premium living room window with elegant sheer curtains, completely black and white photography.",
+        "usage": "Use with heavy opacity overlay (opacity-20) behind empty state messages in Orders or Chat."
+      },
+      {
+        "category": "premium_logo_mark",
+        "url": "https://static.prod-images.emergentagent.com/jobs/f315529b-cdd9-4734-9d45-3cdd0c03f171/images/8feb61d3532ccbdb7feeb97a1dc5779a055c665d188e4851369982bfdefaef13.png",
+        "description": "Abstract 3d render of a smooth liquid glass sphere, pure black and white.",
+        "usage": "Use as the app icon / logo in the header and login screen."
+      }
+    ]
+  },
+  "icons_library": "lucide-react",
+  "instructions_to_main_agent": [
+    "This is a 'mobile-app' experience built with web technologies (React/Tailwind). Constrain the main wrapper to max-w-[480px] mx-auto min-h-screen to simulate a mobile viewport on desktop.",
+    "Do NOT use pure black (#000000) or pure white (#FFFFFF) for large backgrounds/text. Use #050505 for bg and text-white/90 for main text.",
+    "Ensure the 'Liquid Glass' aesthetic is achieved through stacking `backdrop-blur` utilities and very low opacity white backgrounds (e.g. bg-white/[0.04]).",
+    "Strictly adhere to the Black & White palette. Use typography (size/weight) and opacity for hierarchy, not color.",
+    "For the Calculator, emphasize the numbers using the 'JetBrains Mono' font, large inputs, and a prominent 'Total Sq.m' glass display.",
+    "All interactive elements must include a data-testid attribute in kebab-case.",
+    "Do not use Shadcn default colored components. Override them to match the B&W Liquid Glass theme."
+  ]
+}
