@@ -8,7 +8,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, UploadF
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
-import asyncpg, aiofiles, uuid
+import asyncpg, aiofiles, uuid, asyncio
 import os, logging, bcrypt, jwt, secrets, string, json
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
@@ -669,6 +669,30 @@ async def seed_admin(db):
         )
         logger.info("Demo ishchi yaratildi")
 
+# ─── HEALTH CHECK ───
+@api_router.get("/health")
+async def health_check():
+    try:
+        db = await get_pool()
+        await db.fetchval("SELECT 1")
+        return {"status": "ok", "database": "connected", "time": datetime.now(timezone.utc).isoformat()}
+    except Exception as e:
+        return {"status": "error", "database": str(e)}
+
+# ─── KEEP ALIVE - PostgreSQL uxlab qolmasligi uchun ───
+async def keep_alive_task():
+    """Har 5 daqiqada PostgreSQL'ga ping yuborib, uxlab qolmasligini ta'minlaydi"""
+    while True:
+        try:
+            await asyncio.sleep(300)  # 5 daqiqa
+            db = await get_pool()
+            await db.fetchval("SELECT 1")
+            logger.info("🟢 Keep-alive ping → PostgreSQL OK")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"🔴 Keep-alive ping xatolik: {e}")
+
 @app.on_event("startup")
 async def startup():
     global pool
@@ -676,7 +700,8 @@ async def startup():
     async with pool.acquire() as conn:
         await create_tables(conn)
         await seed_admin(conn)
-    logger.info("Server ishga tushdi! (PostgreSQL)")
+    asyncio.create_task(keep_alive_task())
+    logger.info("Server ishga tushdi! (PostgreSQL + Keep-Alive)")
 
 @app.on_event("shutdown")
 async def shutdown():
