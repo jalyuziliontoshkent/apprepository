@@ -3,9 +3,20 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Wrench, Plus, X, UserCheck, CheckCircle, Hash, Truck, Phone, User } from 'lucide-react-native';
+import { Plus, X, UserCheck, CheckCircle, Hash, Truck, Clock } from 'lucide-react-native';
 import { api } from '../_layout';
 import { colors, formatPrice, statusLabels, statusColors } from '../../src/utils/theme';
+
+const formatTime = (iso: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const day = d.getDate().toString().padStart(2, '0');
+  const mon = (d.getMonth() + 1).toString().padStart(2, '0');
+  const year = d.getFullYear();
+  const h = d.getHours().toString().padStart(2, '0');
+  const m = d.getMinutes().toString().padStart(2, '0');
+  return `${day}.${mon}.${year}  ${h}:${m}`;
+};
 
 export default function AdminWorkers() {
   const [tab, setTab] = useState<'workers'|'orders'>('workers');
@@ -37,8 +48,10 @@ export default function AdminWorkers() {
   };
 
   const assignItem = async (orderId: string, itemIdx: number, workerId: string) => {
-    try { await api(`/orders/${orderId}/items/${itemIdx}/assign`, { method: 'PUT', body: JSON.stringify({ worker_id: workerId }) }); fetchAll(); }
-    catch (e) { console.error(e); }
+    try {
+      await api(`/orders/${orderId}/items/${itemIdx}/assign`, { method: 'PUT', body: JSON.stringify({ worker_id: workerId }) });
+      fetchAll();
+    } catch (e) { console.error(e); }
   };
 
   const assignDelivery = async () => {
@@ -68,12 +81,16 @@ export default function AdminWorkers() {
         ))}
       </View>
       <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(); }} tintColor="#fff" />} contentContainerStyle={s.scroll}>
+
+        {/* ISHCHILAR */}
         {tab === 'workers' && (
           <>
             <TouchableOpacity testID="add-worker-btn" style={s.addBtn} onPress={() => setShowAddWorker(true)}>
               <Plus size={16} color="#fff" /><Text style={s.addBtnText}>Ishchi qo'shish</Text>
             </TouchableOpacity>
-            {workers.map(w => (
+            {workers.length === 0 ? (
+              <View style={s.empty}><Text style={s.emptyText}>Ishchilar yo'q</Text></View>
+            ) : workers.map(w => (
               <View key={w.id} style={s.card} testID={`worker-${w.id}`}>
                 <View style={s.cardRow}>
                   <View style={s.avatar}><Text style={s.avatarText}>{w.name?.charAt(0)}</Text></View>
@@ -90,12 +107,15 @@ export default function AdminWorkers() {
             ))}
           </>
         )}
+
+        {/* BUYURTMALAR */}
         {tab === 'orders' && (
           <>
             {orders.length === 0 ? (
-              <View style={s.empty}><Package size={48} color="rgba(255,255,255,0.08)" /><Text style={s.emptyText}>Buyurtmalar yo'q</Text></View>
+              <View style={s.empty}><Text style={s.emptyText}>Buyurtmalar yo'q</Text></View>
             ) : orders.map(order => (
               <View key={order.id} style={s.orderCard} testID={`manage-order-${order.id}`}>
+                {/* Header: code + status */}
                 <View style={s.orderHead}>
                   <View style={s.codeBadge}><Hash size={12} color={colors.accent} /><Text style={s.codeText}>{order.order_code}</Text></View>
                   <View style={[s.statusBadge, { backgroundColor: (statusColors[order.status] || '#fff') + '18' }]}>
@@ -103,40 +123,56 @@ export default function AdminWorkers() {
                     <Text style={[s.statusLabel, { color: statusColors[order.status] }]}>{statusLabels[order.status]}</Text>
                   </View>
                 </View>
-                <Text style={s.dealer}>{order.dealer_name} - {formatPrice(order.total_price)}</Text>
-                {/* Items with worker assign */}
-                {order.items?.map((item: any, idx: number) => (
-                  <View key={idx} style={s.itemRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.itemName}>{item.material_name}</Text>
-                      <Text style={s.itemSize}>{item.width}m x {item.height}m = {item.sqm} kv.m</Text>
-                    </View>
-                    {item.assigned_worker_name ? (
-                      <View style={s.assignedBadge}>
-                        <UserCheck size={12} color={item.worker_status === 'completed' ? colors.success : colors.accent} />
-                        <Text style={[s.assignedText, { color: item.worker_status === 'completed' ? colors.success : colors.accent }]}>{item.assigned_worker_name}</Text>
-                        {item.worker_status === 'completed' && <Text style={s.checkMark}>done</Text>}
+
+                {/* Dealer + Time */}
+                <Text style={s.dealer}>{order.dealer_name}</Text>
+                <View style={s.timeRow}>
+                  <Clock size={12} color={colors.textTer} />
+                  <Text style={s.timeText}>{formatTime(order.created_at)}</Text>
+                </View>
+
+                {/* Items + Worker assign */}
+                <View style={s.itemsSection}>
+                  {order.items?.map((item: any, idx: number) => (
+                    <View key={idx} style={s.itemCard}>
+                      <View style={s.itemInfo}>
+                        <Text style={s.itemName}>{item.material_name}</Text>
+                        <Text style={s.itemSize}>{item.width}m x {item.height}m = {item.sqm} kv.m</Text>
                       </View>
-                    ) : (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        {workers.map(w => (
-                          <TouchableOpacity key={w.id} testID={`assign-${order.id}-${idx}-${w.id}`} style={s.assignBtn} onPress={() => assignItem(order.id, idx, w.id)}>
-                            <Text style={s.assignBtnText}>{w.name.split(' ')[0]}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    )}
-                  </View>
-                ))}
-                {/* Delivery section */}
-                <View style={s.deliverySection}>
+                      {item.assigned_worker_name ? (
+                        <View style={[s.workerBadge, item.worker_status === 'completed' && s.workerDone]}>
+                          <UserCheck size={13} color={item.worker_status === 'completed' ? colors.success : colors.accent} />
+                          <Text style={[s.workerName, { color: item.worker_status === 'completed' ? colors.success : colors.accent }]}>
+                            {item.assigned_worker_name}
+                          </Text>
+                          {item.worker_status === 'completed' && <CheckCircle size={12} color={colors.success} />}
+                        </View>
+                      ) : (
+                        <View style={s.assignRow}>
+                          {workers.map(w => (
+                            <TouchableOpacity key={w.id} testID={`assign-${order.id}-${idx}-${w.id}`} style={s.assignBtn} onPress={() => assignItem(order.id, idx, w.id)}>
+                              <Text style={s.assignBtnText}>{w.name.split(' ')[0]}</Text>
+                            </TouchableOpacity>
+                          ))}
+                          {workers.length === 0 && <Text style={s.noWorker}>Ishchi qo'shing</Text>}
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </View>
+
+                {/* Price */}
+                <View style={s.priceRow}>
+                  <Text style={s.priceLabel}>{order.total_sqm} kv.m</Text>
+                  <Text style={s.priceVal}>{formatPrice(order.total_price)}</Text>
+                </View>
+
+                {/* Delivery actions */}
+                <View style={s.actions}>
                   {order.delivery_info ? (
                     <View style={s.deliveryInfo}>
-                      <Truck size={16} color={colors.blue} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.driverName}>{order.delivery_info.driver_name}</Text>
-                        <Text style={s.driverPhone}>{order.delivery_info.driver_phone} {order.delivery_info.plate_number ? '| ' + order.delivery_info.plate_number : ''}</Text>
-                      </View>
+                      <Truck size={15} color={colors.blue} />
+                      <Text style={s.driverText}>{order.delivery_info.driver_name}  {order.delivery_info.driver_phone}</Text>
                     </View>
                   ) : (order.status === 'tayyor' || order.status === 'tayyorlanmoqda') ? (
                     <TouchableOpacity testID={`add-delivery-${order.id}`} style={s.deliveryBtn} onPress={() => { setSelectedOrder(order); setShowDelivery(true); }}>
@@ -154,31 +190,33 @@ export default function AdminWorkers() {
           </>
         )}
       </ScrollView>
+
       {/* Add Worker Modal */}
       <Modal visible={showAddWorker} transparent animationType="slide">
         <View style={s.modalBg}><View style={s.modal}>
           <View style={s.modalH}><Text style={s.modalTitle}>Yangi Ishchi</Text><TouchableOpacity testID="close-add-worker" onPress={() => setShowAddWorker(false)}><X size={22} color="rgba(255,255,255,0.4)" /></TouchableOpacity></View>
           <ScrollView style={s.modalBody}>
-            {[{ k: 'name', l: 'Ism', p: 'Ism', kb: 'default' as const }, { k: 'email', l: 'Email', p: 'email@...', kb: 'email-address' as const }, { k: 'password', l: 'Parol', p: 'Parol', kb: 'default' as const }, { k: 'phone', l: 'Telefon', p: '+998...', kb: 'phone-pad' as const }, { k: 'specialty', l: 'Mutaxassislik', p: 'Jalyuzi', kb: 'default' as const }].map(f => (
+            {[{ k: 'name', l: 'Ism', p: 'Ism' }, { k: 'email', l: 'Email', p: 'email@...' }, { k: 'password', l: 'Parol', p: 'Parol' }, { k: 'phone', l: 'Telefon', p: '+998...' }, { k: 'specialty', l: 'Mutaxassislik', p: 'Jalyuzi' }].map(f => (
               <View key={f.k}>
                 <Text style={s.label}>{f.l}</Text>
-                <TextInput testID={`worker-${f.k}`} style={s.modalInput} value={(wForm as any)[f.k]} onChangeText={v => setWForm({...wForm, [f.k]: v})} placeholder={f.p} placeholderTextColor="rgba(255,255,255,0.2)" keyboardType={f.kb} secureTextEntry={f.k === 'password'} autoCapitalize={f.k === 'email' ? 'none' : 'words'} />
+                <TextInput testID={`worker-${f.k}`} style={s.modalInput} value={(wForm as any)[f.k]} onChangeText={v => setWForm({...wForm, [f.k]: v})} placeholder={f.p} placeholderTextColor="rgba(255,255,255,0.2)" secureTextEntry={f.k === 'password'} autoCapitalize={f.k === 'email' ? 'none' : 'words'} keyboardType={f.k === 'phone' ? 'phone-pad' : f.k === 'email' ? 'email-address' : 'default'} />
               </View>
             ))}
             <TouchableOpacity testID="save-worker" style={s.saveBtn} onPress={addWorker}><Text style={s.saveBtnText}>Saqlash</Text></TouchableOpacity>
           </ScrollView>
         </View></View>
       </Modal>
-      {/* Add Delivery Modal */}
+
+      {/* Delivery Modal */}
       <Modal visible={showDelivery} transparent animationType="slide">
         <View style={s.modalBg}><View style={s.modal}>
-          <View style={s.modalH}><Text style={s.modalTitle}>Yetkazish ma'lumoti</Text><TouchableOpacity testID="close-delivery" onPress={() => setShowDelivery(false)}><X size={22} color="rgba(255,255,255,0.4)" /></TouchableOpacity></View>
+          <View style={s.modalH}><Text style={s.modalTitle}>Yetkazish</Text><TouchableOpacity testID="close-delivery" onPress={() => setShowDelivery(false)}><X size={22} color="rgba(255,255,255,0.4)" /></TouchableOpacity></View>
           <ScrollView style={s.modalBody}>
             <Text style={s.label}>Haydovchi ismi</Text>
             <TextInput testID="delivery-driver" style={s.modalInput} value={dForm.driver_name} onChangeText={v => setDForm({...dForm, driver_name: v})} placeholder="Ism" placeholderTextColor="rgba(255,255,255,0.2)" />
             <Text style={s.label}>Telefon</Text>
             <TextInput testID="delivery-phone" style={s.modalInput} value={dForm.driver_phone} onChangeText={v => setDForm({...dForm, driver_phone: v})} placeholder="+998..." placeholderTextColor="rgba(255,255,255,0.2)" keyboardType="phone-pad" />
-            <Text style={s.label}>Mashina raqami (ixtiyoriy)</Text>
+            <Text style={s.label}>Mashina raqami</Text>
             <TextInput testID="delivery-plate" style={s.modalInput} value={dForm.plate_number} onChangeText={v => setDForm({...dForm, plate_number: v})} placeholder="01A123BC" placeholderTextColor="rgba(255,255,255,0.2)" autoCapitalize="characters" />
             <TouchableOpacity testID="save-delivery" style={s.saveBtn} onPress={assignDelivery}><Text style={s.saveBtnText}>Biriktirish</Text></TouchableOpacity>
           </ScrollView>
@@ -187,8 +225,6 @@ export default function AdminWorkers() {
     </SafeAreaView>
   );
 }
-
-const Package = ({ size, color }: any) => <View style={{ width: size, height: size }} />;
 
 const s = StyleSheet.create({
   c: { flex: 1, backgroundColor: colors.bg },
@@ -216,25 +252,33 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
   emptyText: { fontSize: 15, color: colors.textTer },
   orderCard: { backgroundColor: colors.card, borderRadius: 22, borderWidth: 1, borderColor: colors.cardBorder, padding: 18, marginBottom: 14 },
-  orderHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  orderHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   codeBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.accentSoft, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
   codeText: { fontSize: 14, fontWeight: '800', color: colors.accent, letterSpacing: 1.5, fontVariant: ['tabular-nums'] },
   statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, gap: 5 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  dealer: { fontSize: 13, color: colors.textSec, marginBottom: 8 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)', gap: 8 },
+  dealer: { fontSize: 15, fontWeight: '600', color: '#fff', marginTop: 4 },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4, marginBottom: 12 },
+  timeText: { fontSize: 12, color: colors.textTer },
+  itemsSection: { gap: 6 },
+  itemCard: { backgroundColor: 'rgba(255,255,255,0.025)', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' },
+  itemInfo: { marginBottom: 8 },
   itemName: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  itemSize: { fontSize: 11, color: colors.textTer },
-  assignedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.accentSoft, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  assignedText: { fontSize: 11, fontWeight: '700' },
-  checkMark: { fontSize: 9, color: colors.success, fontWeight: '700', textTransform: 'uppercase', marginLeft: 2 },
-  assignBtn: { backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 12, marginRight: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  assignBtnText: { fontSize: 12, fontWeight: '600', color: '#fff' },
-  deliverySection: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', gap: 8 },
-  deliveryInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.blueSoft, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(68,138,255,0.15)' },
-  driverName: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  driverPhone: { fontSize: 12, color: colors.textSec, marginTop: 2 },
+  itemSize: { fontSize: 12, color: colors.textSec, marginTop: 2 },
+  workerBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.accentSoft, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, alignSelf: 'flex-start' },
+  workerDone: { backgroundColor: colors.successSoft },
+  workerName: { fontSize: 13, fontWeight: '700' },
+  assignRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  assignBtn: { backgroundColor: colors.accent, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
+  assignBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  noWorker: { fontSize: 12, color: colors.textTer, fontStyle: 'italic' },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
+  priceLabel: { fontSize: 13, color: colors.textSec },
+  priceVal: { fontSize: 18, fontWeight: '800', color: '#fff' },
+  actions: { marginTop: 10, gap: 8 },
+  deliveryInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.blueSoft, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10 },
+  driverText: { fontSize: 13, color: colors.blue, fontWeight: '600' },
   deliveryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 44, backgroundColor: colors.blue, borderRadius: 22 },
   deliveryBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
   confirmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 48, backgroundColor: colors.success, borderRadius: 24 },

@@ -61,7 +61,7 @@ export default function AdminOrders() {
               <View style={s.orderBody}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.dealerName}>{order.dealer_name}</Text>
-                  <Text style={s.orderDate}>{new Date(order.created_at).toLocaleDateString('uz-UZ')}</Text>
+                  <Text style={s.orderDate}>{(() => { const d = new Date(order.created_at); return `${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}  ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; })()}</Text>
                 </View>
                 <View style={s.priceBox}>
                   <Text style={s.orderPrice}>{formatPrice(order.total_price)}</Text>
