@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
-  ActivityIndicator, Modal, TextInput, Image,
+  ActivityIndicator, Modal, TextInput, Image, Alert, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, X, Search, ImagePlus } from 'lucide-react-native';
+import { Plus, X, Search, ImagePlus, Camera, Upload } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../_layout';
 import { colors, formatPrice } from '../../src/utils/theme';
+import Constants from 'expo-constants';
 
 export default function AdminInventory() {
   const [materials, setMaterials] = useState<any[]>([]);
@@ -15,6 +18,10 @@ export default function AdminInventory() {
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState({ name: '', category: 'Parda', price_per_sqm: '', stock_quantity: '', description: '', image_url: '' });
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
   const fetch_ = useCallback(async () => {
     try { setMaterials(await api('/materials')); }
@@ -24,9 +31,58 @@ export default function AdminInventory() {
 
   useEffect(() => { fetch_(); }, []);
 
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Ruxsat kerak', 'Rasm tanlash uchun galereyaga kirish ruxsati kerak.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setImageUri(result.assets[0].uri);
+    }
+  };
+
+  const uploadImage = async (): Promise<string> => {
+    if (!imageUri) return form.image_url;
+    setUploading(true);
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const formData = new FormData();
+      const filename = imageUri.split('/').pop() || 'photo.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      formData.append('file', { uri: imageUri, name: filename, type } as any);
+
+      const res = await fetch(`${BACKEND_URL}/api/upload-image`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Rasm yuklanmadi');
+      const data = await res.json();
+      return data.image_url;
+    } catch (e) {
+      console.error('Image upload error:', e);
+      Alert.alert('Xatolik', 'Rasm yuklashda xatolik yuz berdi');
+      return '';
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const addMaterial = async () => {
     if (!form.name || !form.price_per_sqm || !form.stock_quantity) return;
     try {
+      let image_url = form.image_url;
+      if (imageUri) {
+        image_url = await uploadImage();
+      }
       await api('/materials', {
         method: 'POST',
         body: JSON.stringify({
@@ -34,11 +90,12 @@ export default function AdminInventory() {
           price_per_sqm: parseFloat(form.price_per_sqm),
           stock_quantity: parseFloat(form.stock_quantity),
           description: form.description, unit: 'kv.m',
-          image_url: form.image_url,
+          image_url: image_url,
         }),
       });
       setShowAdd(false);
       setForm({ name: '', category: 'Parda', price_per_sqm: '', stock_quantity: '', description: '', image_url: '' });
+      setImageUri(null);
       fetch_();
     } catch (e) { console.error(e); }
   };
@@ -123,17 +180,23 @@ export default function AdminInventory() {
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              <Text style={styles.inputLabel}>Rasm URL</Text>
-              <View style={styles.imagePreviewRow}>
-                {form.image_url ? (
-                  <Image source={{ uri: form.image_url }} style={styles.imagePreview} />
+              <Text style={styles.inputLabel}>Rasm</Text>
+              <TouchableOpacity testID="pick-image-btn" style={styles.imagePickerBtn} onPress={pickImage} activeOpacity={0.7}>
+                {imageUri ? (
+                  <Image source={{ uri: imageUri }} style={styles.imagePickerPreview} />
                 ) : (
-                  <View style={styles.imagePreviewEmpty}>
-                    <ImagePlus size={24} color="rgba(255,255,255,0.2)" />
+                  <View style={styles.imagePickerPlaceholder}>
+                    <Upload size={28} color="rgba(255,255,255,0.3)" />
+                    <Text style={styles.imagePickerText}>Galereyadan tanlash</Text>
                   </View>
                 )}
-                <TextInput testID="material-image-input" style={[styles.input, { flex: 1 }]} value={form.image_url} onChangeText={v => setForm({ ...form, image_url: v })} placeholderTextColor="rgba(255,255,255,0.25)" placeholder="https://..." autoCapitalize="none" />
-              </View>
+              </TouchableOpacity>
+              {imageUri && (
+                <TouchableOpacity style={styles.removeImageBtn} onPress={() => setImageUri(null)}>
+                  <X size={14} color="rgba(255,255,255,0.5)" />
+                  <Text style={styles.removeImageText}>Rasmni olib tashlash</Text>
+                </TouchableOpacity>
+              )}
 
               <Text style={styles.inputLabel}>Nomi</Text>
               <TextInput testID="material-name-input" style={styles.input} value={form.name} onChangeText={v => setForm({ ...form, name: v })} placeholderTextColor="rgba(255,255,255,0.25)" placeholder="Material nomi" />
@@ -161,8 +224,15 @@ export default function AdminInventory() {
               <Text style={styles.inputLabel}>Tavsif</Text>
               <TextInput testID="material-desc-input" style={[styles.input, { height: 60 }]} value={form.description} onChangeText={v => setForm({ ...form, description: v })} placeholderTextColor="rgba(255,255,255,0.25)" placeholder="Qo'shimcha ma'lumot" multiline />
 
-              <TouchableOpacity testID="save-material-btn" style={styles.saveBtn} onPress={addMaterial}>
-                <Text style={styles.saveBtnText}>Saqlash</Text>
+              <TouchableOpacity testID="save-material-btn" style={[styles.saveBtn, uploading && { opacity: 0.6 }]} onPress={addMaterial} disabled={uploading}>
+                {uploading ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <ActivityIndicator size="small" color="#fff" />
+                    <Text style={styles.saveBtnText}>Yuklanmoqda...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.saveBtnText}>Saqlash</Text>
+                )}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -223,6 +293,12 @@ const styles = StyleSheet.create({
   imagePreviewRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   imagePreview: { width: 56, height: 56, borderRadius: 14, backgroundColor: '#111' },
   imagePreviewEmpty: { width: 56, height: 56, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.03)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderStyle: 'dashed' },
+  imagePickerBtn: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderStyle: 'dashed' },
+  imagePickerPreview: { width: '100%', height: 180, borderRadius: 16 },
+  imagePickerPlaceholder: { height: 140, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.03)', gap: 8 },
+  imagePickerText: { fontSize: 13, color: 'rgba(255,255,255,0.35)', fontWeight: '500' },
+  removeImageBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 8, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: 'rgba(255,80,80,0.1)' },
+  removeImageText: { fontSize: 12, color: 'rgba(255,80,80,0.7)', fontWeight: '500' },
   catRow: { flexDirection: 'row', gap: 8 },
   catBtn: { flex: 1, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
   catBtnActive: { backgroundColor: colors.accent },

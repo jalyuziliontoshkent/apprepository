@@ -4,9 +4,11 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, UploadFile, File
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
+import aiofiles, uuid
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 import os, logging, bcrypt, jwt, secrets, string
@@ -21,7 +23,11 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+UPLOAD_DIR = ROOT_DIR / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
+
 app = FastAPI()
+app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 api_router = APIRouter(prefix="/api")
 JWT_ALGORITHM = "HS256"
 
@@ -312,6 +318,20 @@ async def get_chat_partners(user: dict = Depends(get_current_user)):
         uc = await db.messages.count_documents({"sender_id": admin["id"], "receiver_id": user["id"], "read": False})
         admin["last_message"] = lm.get("text","") if lm else ""; admin["last_message_time"] = lm.get("created_at","") if lm else ""; admin["unread_count"] = uc
         return [admin]
+
+# ─── IMAGE UPLOAD ───
+@api_router.post("/upload-image")
+async def upload_image(file: UploadFile = File(...), user: dict = Depends(require_admin)):
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(400, "Faqat rasm fayllari ruxsat etiladi")
+    ext = file.filename.split(".")[-1] if file.filename and "." in file.filename else "jpg"
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    filepath = UPLOAD_DIR / filename
+    async with aiofiles.open(filepath, "wb") as f:
+        content = await file.read()
+        await f.write(content)
+    image_url = f"/api/uploads/{filename}"
+    return {"image_url": image_url}
 
 # ─── STATISTICS ───
 @api_router.get("/statistics")
