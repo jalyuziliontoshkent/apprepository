@@ -57,8 +57,12 @@ async def get_current_user(request: Request) -> dict:
     if not auth.startswith("Bearer "): raise HTTPException(401, "Not authenticated")
     try:
         p = jwt.decode(auth[7:], get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        try:
+            user_id = int(p["sub"])
+        except (ValueError, TypeError):
+            raise HTTPException(401, "Invalid token format - please login again")
         db = await get_pool()
-        row = await db.fetchrow("SELECT * FROM users WHERE id = $1", int(p["sub"]))
+        row = await db.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
         if not row: raise HTTPException(401, "User not found")
         user = row_to_dict(row)
         user["id"] = str(user["id"])
@@ -66,6 +70,10 @@ async def get_current_user(request: Request) -> dict:
         return user
     except jwt.ExpiredSignatureError: raise HTTPException(401, "Token expired")
     except jwt.InvalidTokenError: raise HTTPException(401, "Invalid token")
+    except HTTPException: raise
+    except Exception as e:
+        logger.error(f"Auth error: {e}")
+        raise HTTPException(401, "Authentication failed")
 
 async def require_admin(request: Request) -> dict:
     u = await get_current_user(request)
