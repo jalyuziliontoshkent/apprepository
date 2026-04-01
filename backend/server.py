@@ -5,14 +5,16 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, UploadFile, File
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
-import asyncpg, aiofiles, uuid, asyncio
+import asyncpg, aiofiles, uuid, asyncio, io
 import os, logging, bcrypt, jwt, secrets, string, json
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 from typing import List, Optional
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -676,6 +678,151 @@ async def seed_admin(db):
             "Aziz Ishchi", "worker@test.uz", hash_password("worker123"), "worker", "+998901112233", 0.0, "Jalyuzi o'rnatish", now
         )
         logger.info("Demo ishchi yaratildi")
+
+# ─── REPORTS - Hisobot tizimi ───
+@api_router.get("/reports")
+async def get_reports(admin: dict = Depends(require_admin)):
+    db = await get_pool()
+    now = datetime.now(timezone.utc)
+
+    # Weekly & Monthly revenue
+    week_ago = (now - timedelta(days=7)).isoformat()
+    month_ago = (now - timedelta(days=30)).isoformat()
+
+    weekly_revenue = await db.fetchval(
+        "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND status NOT IN ('rad_etilgan')", week_ago
+    )
+    monthly_revenue = await db.fetchval(
+        "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND status NOT IN ('rad_etilgan')", month_ago
+    )
+    total_revenue = await db.fetchval(
+        "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE status NOT IN ('rad_etilgan')"
+    )
+    weekly_orders = await db.fetchval("SELECT COUNT(*) FROM orders WHERE created_at >= $1", week_ago)
+    monthly_orders = await db.fetchval("SELECT COUNT(*) FROM orders WHERE created_at >= $1", month_ago)
+    total_orders = await db.fetchval("SELECT COUNT(*) FROM orders")
+
+    # Top selling materials (from order items)
+    all_orders = await db.fetch("SELECT items FROM orders WHERE status NOT IN ('rad_etilgan')")
+    mat_stats: dict = {}
+    for row in all_orders:
+        items = json.loads(row["items"]) if isinstance(row["items"], str) else row["items"]
+        for it in items:
+            name = it.get("material_name", "Noma'lum")
+            sqm = it.get("sqm", 0)
+            price = it.get("price", 0)
+            if name not in mat_stats:
+                mat_stats[name] = {"name": name, "total_sqm": 0, "total_price": 0, "count": 0}
+            mat_stats[name]["total_sqm"] += sqm
+            mat_stats[name]["total_price"] += price
+            mat_stats[name]["count"] += 1
+
+    top_materials = sorted(mat_stats.values(), key=lambda x: x["total_price"], reverse=True)[:5]
+
+    # Top dealers
+    dealer_rows = await db.fetch("""
+        SELECT u.name, COUNT(o.id) as order_count, COALESCE(SUM(o.total_price), 0) as revenue
+        FROM orders o JOIN users u ON o.dealer_id = u.id
+        WHERE o.status NOT IN ('rad_etilgan')
+        GROUP BY u.name ORDER BY revenue DESC LIMIT 5
+    """)
+    top_dealers = [{"name": r["name"], "orders": r["order_count"], "revenue": round(float(r["revenue"]), 2)} for r in dealer_rows]
+
+    # Daily orders for last 7 days
+    daily = []
+    for i in range(6, -1, -1):
+        day_start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0).isoformat()
+        day_end = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59).isoformat()
+        cnt = await db.fetchval("SELECT COUNT(*) FROM orders WHERE created_at >= $1 AND created_at <= $2", day_start, day_end)
+        rev = await db.fetchval("SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND created_at <= $2 AND status NOT IN ('rad_etilgan')", day_start, day_end)
+        day_label = (now - timedelta(days=i)).strftime("%d.%m")
+        daily.append({"day": day_label, "orders": cnt, "revenue": round(float(rev), 2)})
+
+    return {
+        "weekly_revenue": round(float(weekly_revenue), 2),
+        "monthly_revenue": round(float(monthly_revenue), 2),
+        "total_revenue": round(float(total_revenue), 2),
+        "weekly_orders": weekly_orders,
+        "monthly_orders": monthly_orders,
+        "total_orders": total_orders,
+        "top_materials": top_materials,
+        "top_dealers": top_dealers,
+        "daily": daily,
+    }
+
+# ─── LOW STOCK ALERTS ───
+@api_router.get("/alerts/low-stock")
+async def get_low_stock(admin: dict = Depends(require_admin)):
+    db = await get_pool()
+    rows = await db.fetch("SELECT * FROM materials WHERE stock_quantity < 10 ORDER BY stock_quantity ASC")
+    out = []
+    for r in rows:
+        m = row_to_dict(r)
+        m["id"] = str(m["id"])
+        out.append(m)
+    return out
+
+# ─── EXCEL EXPORT ───
+@api_router.get("/reports/export-orders")
+async def export_orders_excel(admin: dict = Depends(require_admin)):
+    db = await get_pool()
+    orders = await db.fetch("SELECT * FROM orders ORDER BY created_at DESC")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Buyurtmalar"
+
+    # Styling
+    header_font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    header_fill = PatternFill(start_color='6C63FF', end_color='6C63FF', fill_type='solid')
+    border = Border(
+        left=Side(style='thin', color='DDDDDD'),
+        right=Side(style='thin', color='DDDDDD'),
+        top=Side(style='thin', color='DDDDDD'),
+        bottom=Side(style='thin', color='DDDDDD'),
+    )
+
+    headers = ['#', 'Buyurtma kodi', 'Diler', 'Mahsulotlar', 'Jami kv.m', 'Jami narx ($)', 'Status', 'Sana']
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+        cell.border = border
+
+    for idx, order in enumerate(orders, 1):
+        items = json.loads(order["items"]) if isinstance(order["items"], str) else order["items"]
+        item_names = ", ".join([f'{it["material_name"]} ({it.get("width", 0)}x{it.get("height", 0)}m)' for it in items])
+        status_map = {"kutilmoqda": "Kutilmoqda", "tasdiqlangan": "Tasdiqlangan", "tayyorlanmoqda": "Tayyorlanmoqda", "tayyor": "Tayyor", "yetkazilmoqda": "Yetkazilmoqda", "yetkazildi": "Yetkazildi", "rad_etilgan": "Rad etilgan"}
+
+        row = [idx, order["order_code"], order["dealer_name"], item_names, round(order["total_sqm"], 2), round(order["total_price"], 2), status_map.get(order["status"], order["status"]), order["created_at"][:16].replace("T", " ")]
+        for col, val in enumerate(row, 1):
+            cell = ws.cell(row=idx+1, column=col, value=val)
+            cell.border = border
+            if col in [5, 6]:
+                cell.alignment = Alignment(horizontal='right')
+                cell.number_format = '#,##0.00'
+
+    # Column widths
+    ws.column_dimensions['A'].width = 5
+    ws.column_dimensions['B'].width = 15
+    ws.column_dimensions['C'].width = 18
+    ws.column_dimensions['D'].width = 50
+    ws.column_dimensions['E'].width = 12
+    ws.column_dimensions['F'].width = 14
+    ws.column_dimensions['G'].width = 16
+    ws.column_dimensions['H'].width = 18
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    today = datetime.now(timezone.utc).strftime('%Y%m%d')
+
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=buyurtmalar_{today}.xlsx"}
+    )
 
 # ─── HEALTH CHECK ───
 @api_router.get("/health")

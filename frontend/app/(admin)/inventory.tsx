@@ -163,7 +163,13 @@ export default function AdminInventory() {
                 </View>
                 <Text style={styles.productName} numberOfLines={1}>{mat.name}</Text>
                 <Text style={styles.productPrice}>{formatPrice(mat.price_per_sqm)}<Text style={styles.productUnit}>/kv.m</Text></Text>
-                <Text style={styles.productStock}>{mat.stock_quantity} {mat.unit} qoldiq</Text>
+                {mat.stock_quantity < 10 ? (
+                  <View style={styles.lowStockBadge}>
+                    <Text style={styles.lowStockText}>⚠️ {mat.stock_quantity} {mat.unit} — kam qoldi!</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.productStock}>{mat.stock_quantity} {mat.unit} qoldiq</Text>
+                )}
               </View>
             </View>
           ))}
@@ -273,6 +279,8 @@ const styles = StyleSheet.create({
   productPrice: { fontSize: 17, fontWeight: '700', color: '#fff', marginTop: 2 },
   productUnit: { fontSize: 11, fontWeight: '400', color: 'rgba(255,255,255,0.4)' },
   productStock: { fontSize: 11, color: 'rgba(255,255,255,0.3)' },
+  lowStockBadge: { marginTop: 4, backgroundColor: 'rgba(255,82,82,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start', borderWidth: 1, borderColor: 'rgba(255,82,82,0.15)' },
+  lowStockText: { fontSize: 11, fontWeight: '700', color: '#FF5252' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: '#0c0c0c', borderTopLeftRadius: 28, borderTopRightRadius: 28,

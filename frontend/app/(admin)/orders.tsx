@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, TextInput, Image,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, TextInput, Image, Alert, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Package, Check, X, Hash, Clock, User, Layers, ChevronRight, Truck, MapPin } from 'lucide-react-native';
+import { Package, Check, X, Hash, Clock, User, Layers, ChevronRight, Truck, MapPin, FileSpreadsheet } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { api } from '../_layout';
 import { colors, statusColors, statusLabels, formatPrice } from '../../src/utils/theme';
 
@@ -15,6 +18,8 @@ export default function AdminOrders() {
   const [showModal, setShowModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [filter, setFilter] = useState('all');
+
+  const [exporting, setExporting] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     try { setOrders(await api('/orders')); }
@@ -31,6 +36,31 @@ export default function AdminOrders() {
     } catch (e) { console.error(e); }
   };
 
+  const exportToExcel = async () => {
+    setExporting(true);
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+      if (Platform.OS === 'web') {
+        const res = await fetch(`${BACKEND_URL}/api/reports/export-orders`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'buyurtmalar.xlsx'; a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const fileUri = FileSystem.documentDirectory + 'buyurtmalar.xlsx';
+        const res = await FileSystem.downloadAsync(`${BACKEND_URL}/api/reports/export-orders`, fileUri, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(res.uri);
+        } else {
+          Alert.alert('Tayyor', 'Fayl saqlandi: ' + res.uri);
+        }
+      }
+    } catch (e: any) { Alert.alert('Xatolik', e.message || 'Export xatosi'); }
+    finally { setExporting(false); }
+  };
+
   const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter);
   const filters = ['all', 'kutilmoqda', 'tasdiqlangan', 'tayyorlanmoqda', 'tayyor', 'yetkazilmoqda', 'yetkazildi', 'rad_etilgan'];
   const filterLabels: Record<string, string> = { all: 'Barchasi', ...statusLabels };
@@ -44,7 +74,13 @@ export default function AdminOrders() {
 
   return (
     <SafeAreaView style={s.c}>
-      <Text style={s.title}>Buyurtmalar</Text>
+      <View style={s.headerRow}>
+        <Text style={s.title}>Buyurtmalar</Text>
+        <TouchableOpacity style={s.exportBtn} onPress={exportToExcel} disabled={exporting}>
+          {exporting ? <ActivityIndicator size="small" color={colors.success} /> : <FileSpreadsheet size={18} color={colors.success} />}
+          <Text style={s.exportText}>Excel</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Filter chips */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterRow} contentContainerStyle={s.filterContent}>
@@ -241,7 +277,10 @@ export default function AdminOrders() {
 
 const s = StyleSheet.create({
   c: { flex: 1, backgroundColor: colors.bg },
-  title: { fontSize: 26, fontWeight: '800', color: '#fff', paddingHorizontal: 20, paddingTop: 16, letterSpacing: -0.5 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16 },
+  title: { fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,200,83,0.08)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(0,200,83,0.15)' },
+  exportText: { fontSize: 13, fontWeight: '700', color: colors.success },
 
   // Filters
   filterRow: { maxHeight: 48, marginTop: 14 },
