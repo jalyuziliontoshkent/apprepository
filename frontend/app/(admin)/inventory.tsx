@@ -60,8 +60,11 @@ export default function AdminInventory() {
     Alert.alert('O\'chirish', `"${cat.name}" kategoriyasini o'chirasizmi?`, [
       { text: 'Bekor', style: 'cancel' },
       { text: 'O\'chirish', style: 'destructive', onPress: async () => {
-        try { await api(`/categories/${cat.id}`, { method: 'DELETE' }); fetchData(); }
-        catch (e: any) { Alert.alert('Xatolik', e.message); }
+        try {
+          await api(`/categories/${cat.id}`, { method: 'DELETE' });
+          setSelectedCat(null);
+          fetchData();
+        } catch (e: any) { Alert.alert('Xatolik', e.message || 'O\'chirib bo\'lmadi'); }
       }},
     ]);
   };
@@ -143,12 +146,28 @@ export default function AdminInventory() {
           <Text style={[s.catChipText, !selectedCat && s.catChipTextActive]}>Barchasi ({materials.length})</Text>
         </TouchableOpacity>
         {categories.map(cat => (
-          <TouchableOpacity key={cat.id} style={[s.catChip, selectedCat?.id === cat.id && s.catChipActive]} onPress={() => setSelectedCat(cat)}
-            onLongPress={() => { setEditingCat(cat); setCatForm({ name: cat.name, description: cat.description || '' }); setShowCatModal(true); }}>
+          <TouchableOpacity key={cat.id} style={[s.catChip, selectedCat?.id === cat.id && s.catChipActive]} onPress={() => setSelectedCat(cat)}>
             <Text style={[s.catChipText, selectedCat?.id === cat.id && s.catChipTextActive]}>{cat.name} ({cat.material_count || 0})</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* Category edit/delete buttons - when a category is selected */}
+      {selectedCat && (
+        <View style={s.catActions}>
+          <Text style={s.catActionsLabel}>{selectedCat.name}</Text>
+          <View style={s.catActionBtns}>
+            <TouchableOpacity style={s.catEditBtn} onPress={() => { setEditingCat(selectedCat); setCatForm({ name: selectedCat.name, description: selectedCat.description || '' }); setShowCatModal(true); }}>
+              <Edit3 size={14} color={colors.accent} />
+              <Text style={s.catEditText}>Tahrirlash</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.catDelBtn} onPress={() => deleteCat(selectedCat)}>
+              <Trash2 size={14} color="#FF5252" />
+              <Text style={s.catDelText}>O'chirish</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Search */}
       <View style={s.searchRow}>
@@ -266,6 +285,13 @@ const s = StyleSheet.create({
   catChipActive: { backgroundColor: colors.accentSoft, borderColor: 'rgba(108,99,255,0.3)' },
   catChipText: { fontSize: 13, fontWeight: '600', color: colors.textSec },
   catChipTextActive: { color: colors.accent },
+  catActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
+  catActionsLabel: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.5)' },
+  catActionBtns: { flexDirection: 'row', gap: 8 },
+  catEditBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.accentSoft, borderWidth: 1, borderColor: 'rgba(108,99,255,0.2)' },
+  catEditText: { fontSize: 12, fontWeight: '600', color: colors.accent },
+  catDelBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: 'rgba(255,82,82,0.06)', borderWidth: 1, borderColor: 'rgba(255,82,82,0.12)' },
+  catDelText: { fontSize: 12, fontWeight: '600', color: '#FF5252' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginTop: 12, backgroundColor: colors.card, borderRadius: 16, paddingHorizontal: 14, borderWidth: 1, borderColor: colors.cardBorder },
   searchInput: { flex: 1, height: 44, color: '#fff', fontSize: 14 },
   list: { paddingHorizontal: 16, paddingTop: 12 },
