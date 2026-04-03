@@ -1,14 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, TextInput, Alert, Platform,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, TextInput, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { LogOut, TrendingUp, Clock, CheckCircle, Truck, XCircle, Zap, Users, Boxes, Wrench, Settings, X, BarChart3, AlertTriangle, Medal, Calendar } from 'lucide-react-native';
+import {
+  LogOut, TrendingUp, Clock, CheckCircle, Truck, XCircle, Zap, Users, Boxes, Wrench,
+  Settings, X, AlertTriangle, Medal, Calendar, DollarSign, ShoppingCart, ArrowUpRight,
+  BarChart3, Package, ChevronRight, Award, Activity,
+} from 'lucide-react-native';
 import { api } from '../_layout';
-import { colors, formatPrice } from '../../src/utils/theme';
+import { colors, formatPrice, statusColors, statusLabels } from '../../src/utils/theme';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null);
@@ -28,77 +32,49 @@ export default function AdminDashboard() {
   const fetchData = useCallback(async () => {
     try {
       const [statsData, reportsData, lowStockData, userStr] = await Promise.all([
-        api('/statistics'),
-        api('/reports'),
-        api('/alerts/low-stock'),
-        AsyncStorage.getItem('user'),
+        api('/statistics'), api('/reports'), api('/alerts/low-stock'), AsyncStorage.getItem('user'),
       ]);
-      setStats(statsData);
-      setReports(reportsData);
-      setLowStock(lowStockData || []);
-      if (userStr) {
-        const u = JSON.parse(userStr);
-        setUserName(u.name || 'Admin');
-        setUserEmail(u.email || '');
-      }
+      setStats(statsData); setReports(reportsData); setLowStock(lowStockData || []);
+      if (userStr) { const u = JSON.parse(userStr); setUserName(u.name || 'Admin'); setUserEmail(u.email || ''); }
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleLogout = async () => {
-    await AsyncStorage.multiRemove(['token', 'user']);
-    router.replace('/');
-  };
-
-  const openProfile = () => {
-    setProfileForm({ email: userEmail, current_password: '', password: '' });
-    setProfileMsg(''); setProfileErr('');
-    setShowProfile(true);
-  };
-
+  const handleLogout = async () => { await AsyncStorage.multiRemove(['token', 'user']); router.replace('/'); };
+  const openProfile = () => { setProfileForm({ email: userEmail, current_password: '', password: '' }); setProfileMsg(''); setProfileErr(''); setShowProfile(true); };
   const saveProfile = async () => {
     if (!profileForm.current_password) { setProfileErr('Joriy parolni kiriting'); return; }
     setProfileLoading(true); setProfileErr(''); setProfileMsg('');
     try {
       const res = await api('/auth/profile', { method: 'PUT', body: JSON.stringify(profileForm) });
-      await AsyncStorage.setItem('token', res.token);
-      await AsyncStorage.setItem('user', JSON.stringify(res.user));
-      setUserName(res.user.name || 'Admin');
-      setUserEmail(res.user.email || '');
-      setProfileMsg('Profil yangilandi!');
-      setProfileForm({ ...profileForm, current_password: '', password: '' });
+      await AsyncStorage.setItem('token', res.token); await AsyncStorage.setItem('user', JSON.stringify(res.user));
+      setUserName(res.user.name || 'Admin'); setUserEmail(res.user.email || '');
+      setProfileMsg('Profil yangilandi!'); setProfileForm({ ...profileForm, current_password: '', password: '' });
     } catch (e: any) { setProfileErr(e.message || 'Xatolik'); }
     finally { setProfileLoading(false); }
   };
 
+  const fmtNum = (n: number) => n.toLocaleString('en-US');
+  const fmtMoney = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   if (loading) return <SafeAreaView style={s.c}><ActivityIndicator size="large" color={colors.accent} style={{ flex: 1 }} /></SafeAreaView>;
 
-  const statCards = [
-    { icon: Clock, val: stats?.pending_orders || 0, label: 'Kutilmoqda', color: colors.warning },
-    { icon: Zap, val: stats?.preparing_orders || 0, label: 'Tayyorlanmoqda', color: colors.blue },
-    { icon: CheckCircle, val: (stats?.ready_orders || 0), label: 'Tayyor', color: colors.success },
-    { icon: Truck, val: stats?.delivered_orders || 0, label: 'Yetkazildi', color: '#00C853' },
-  ];
-
-  // Max revenue for bar chart
   const maxRevenue = reports?.daily ? Math.max(...reports.daily.map((d: any) => d.revenue), 1) : 1;
+  const topMatMax = reports?.top_materials?.[0]?.total_price || 1;
 
   return (
     <SafeAreaView style={s.c}>
+      {/* Header */}
       <View style={s.header}>
         <View>
-          <Text style={s.hi}>Xush kelibsiz</Text>
+          <Text style={s.greeting}>Assalomu alaykum</Text>
           <Text style={s.name}>{userName}</Text>
         </View>
-        <View style={s.headerBtns}>
-          <TouchableOpacity onPress={openProfile} style={s.headerBtn}>
-            <Settings size={20} color="rgba(255,255,255,0.4)" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleLogout} style={s.headerBtn}>
-            <LogOut size={20} color="rgba(255,255,255,0.4)" />
-          </TouchableOpacity>
+        <View style={s.hBtns}>
+          <TouchableOpacity onPress={openProfile} style={s.hBtn}><Settings size={18} color="rgba(255,255,255,0.35)" /></TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} style={s.hBtn}><LogOut size={18} color="rgba(255,255,255,0.35)" /></TouchableOpacity>
         </View>
       </View>
 
@@ -106,133 +82,177 @@ export default function AdminDashboard() {
 
         {/* Low Stock Alert */}
         {lowStock.length > 0 && (
-          <View style={s.alertBanner}>
-            <View style={s.alertHeader}>
-              <AlertTriangle size={16} color="#FF5252" />
-              <Text style={s.alertTitle}>Material kam qoldi!</Text>
-            </View>
+          <View style={s.alert}>
+            <View style={s.alertH}><AlertTriangle size={14} color="#FF5252" /><Text style={s.alertTitle}>Material kam qoldi!</Text></View>
             {lowStock.map((m, i) => (
-              <View key={i} style={s.alertItem}>
-                <Text style={s.alertItemName}>{m.name}</Text>
-                <Text style={[s.alertItemStock, m.stock_quantity < 3 && { color: '#FF5252' }]}>
-                  {m.stock_quantity} {m.unit || 'kv.m'}
-                </Text>
+              <View key={i} style={s.alertRow}>
+                <Text style={s.alertName}>{m.name}</Text>
+                <Text style={[s.alertQty, m.stock_quantity < 3 && { color: '#FF5252' }]}>{m.stock_quantity} {m.unit}</Text>
               </View>
             ))}
           </View>
         )}
 
-        {/* Revenue Cards */}
-        <View style={s.revenueRow}>
-          <View style={s.revenueCard}>
-            <LinearGradient colors={['#6C63FF', '#4A43CC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.revenueGrad}>
-              <Calendar size={16} color="rgba(255,255,255,0.6)" />
-              <Text style={s.revenueLabel}>Haftalik</Text>
-              <Text style={s.revenueVal}>{formatPrice(reports?.weekly_revenue || 0)}</Text>
-              <Text style={s.revenueSub}>{reports?.weekly_orders || 0} buyurtma</Text>
-            </LinearGradient>
+        {/* Hero Revenue Card */}
+        <LinearGradient colors={['#1a1a2e', '#16213e']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
+          <View style={s.heroTop}>
+            <View style={s.heroIconWrap}><DollarSign size={18} color="#6C63FF" /></View>
+            <Text style={s.heroLabel}>Umumiy daromad</Text>
           </View>
-          <View style={s.revenueCard}>
-            <LinearGradient colors={['#00C853', '#009624']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.revenueGrad}>
-              <TrendingUp size={16} color="rgba(255,255,255,0.6)" />
-              <Text style={s.revenueLabel}>Oylik</Text>
-              <Text style={s.revenueVal}>{formatPrice(reports?.monthly_revenue || 0)}</Text>
-              <Text style={s.revenueSub}>{reports?.monthly_orders || 0} buyurtma</Text>
-            </LinearGradient>
+          <Text style={s.heroValue}>{fmtMoney(reports?.total_revenue || 0)}</Text>
+          <Text style={s.heroSub}>{fmtNum(reports?.total_orders || 0)} ta buyurtma</Text>
+          <View style={s.heroRow}>
+            <View style={s.heroPill}>
+              <Calendar size={12} color="#6C63FF" />
+              <Text style={s.heroPillLabel}>Haftalik</Text>
+              <Text style={s.heroPillVal}>{fmtMoney(reports?.weekly_revenue || 0)}</Text>
+            </View>
+            <View style={s.heroDivider} />
+            <View style={s.heroPill}>
+              <TrendingUp size={12} color="#00E676" />
+              <Text style={s.heroPillLabel}>Oylik</Text>
+              <Text style={s.heroPillVal}>{fmtMoney(reports?.monthly_revenue || 0)}</Text>
+            </View>
           </View>
-        </View>
+        </LinearGradient>
 
-        {/* Status Grid */}
-        <View style={s.grid}>
-          {statCards.map((c, i) => (
-            <View key={i} style={s.statCard}>
-              <View style={[s.statIcon, { backgroundColor: c.color + '18' }]}>
-                <c.icon size={18} color={c.color} />
-              </View>
-              <Text style={s.statVal}>{c.val}</Text>
-              <Text style={s.statLabel}>{c.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Mini Bar Chart - Last 7 days */}
-        {reports?.daily && (
-          <View style={s.chartSection}>
-            <View style={s.sectionHeader}>
-              <BarChart3 size={16} color={colors.accent} />
-              <Text style={s.sectionTitle}>Oxirgi 7 kun</Text>
-            </View>
-            <View style={s.chartRow}>
-              {reports.daily.map((d: any, i: number) => (
-                <View key={i} style={s.chartCol}>
-                  <Text style={s.chartVal}>{d.orders}</Text>
-                  <View style={s.chartBarWrap}>
-                    <View style={[s.chartBar, { height: Math.max((d.revenue / maxRevenue) * 80, 4) }]} />
+        {/* Order Pipeline */}
+        <View style={s.section}>
+          <View style={s.sH}><Activity size={15} color={colors.accent} /><Text style={s.sTitle}>Buyurtma holatlari</Text></View>
+          <View style={s.pipeline}>
+            {[
+              { key: 'pending_orders', label: 'Kutilmoqda', icon: Clock, color: colors.warning },
+              { key: 'approved_orders', label: 'Tasdiqlangan', icon: CheckCircle, color: colors.accent },
+              { key: 'preparing_orders', label: 'Tayyorlanmoqda', icon: Zap, color: colors.blue },
+              { key: 'ready_orders', label: 'Tayyor', icon: Package, color: colors.success },
+              { key: 'delivering_orders', label: 'Yetkazilmoqda', icon: Truck, color: '#29B6F6' },
+              { key: 'delivered_orders', label: 'Yetkazildi', icon: CheckCircle, color: '#00C853' },
+            ].map((item, i) => {
+              const val = stats?.[item.key] || 0;
+              return (
+                <View key={i} style={s.pipeItem}>
+                  <View style={[s.pipeIcon, { backgroundColor: item.color + '15' }]}>
+                    <item.icon size={16} color={item.color} />
                   </View>
-                  <Text style={s.chartDay}>{d.day}</Text>
+                  <Text style={[s.pipeVal, val > 0 && { color: '#fff' }]}>{val}</Text>
+                  <Text style={s.pipeLabel} numberOfLines={1}>{item.label}</Text>
                 </View>
-              ))}
+              );
+            })}
+          </View>
+          {(stats?.rejected_orders || 0) > 0 && (
+            <View style={s.rejectedRow}>
+              <XCircle size={14} color={colors.danger} />
+              <Text style={s.rejectedText}>Rad etilgan: <Text style={{ fontWeight: '800' }}>{stats.rejected_orders}</Text></Text>
+            </View>
+          )}
+        </View>
+
+        {/* 7-Day Chart */}
+        {reports?.daily && (
+          <View style={s.section}>
+            <View style={s.sH}><BarChart3 size={15} color={colors.accent} /><Text style={s.sTitle}>Oxirgi 7 kun</Text></View>
+            <View style={s.chart}>
+              {reports.daily.map((d: any, i: number) => {
+                const barH = Math.max((d.revenue / maxRevenue) * 100, 4);
+                const hasData = d.revenue > 0;
+                return (
+                  <View key={i} style={s.chartCol}>
+                    {hasData && <Text style={s.chartMoney}>{fmtMoney(d.revenue)}</Text>}
+                    <Text style={s.chartCount}>{d.orders}</Text>
+                    <View style={s.chartBarBg}>
+                      <LinearGradient
+                        colors={hasData ? ['#6C63FF', '#4A43CC'] : ['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.03)']}
+                        style={[s.chartBar, { height: barH }]}
+                      />
+                    </View>
+                    <Text style={[s.chartDay, hasData && { color: 'rgba(255,255,255,0.5)' }]}>{d.day}</Text>
+                  </View>
+                );
+              })}
             </View>
           </View>
         )}
 
         {/* Top Materials */}
         {reports?.top_materials?.length > 0 && (
-          <View style={s.topSection}>
-            <View style={s.sectionHeader}>
-              <Medal size={16} color="#FFB300" />
-              <Text style={s.sectionTitle}>Eng ko'p sotilgan</Text>
-            </View>
-            {reports.top_materials.map((m: any, i: number) => (
-              <View key={i} style={s.topItem}>
-                <View style={[s.topRank, i === 0 && { backgroundColor: 'rgba(255,179,0,0.15)' }]}>
-                  <Text style={[s.topRankText, i === 0 && { color: '#FFB300' }]}>{i + 1}</Text>
+          <View style={s.section}>
+            <View style={s.sH}><Award size={15} color="#FFB300" /><Text style={s.sTitle}>Eng ko'p sotilgan materiallar</Text></View>
+            {reports.top_materials.map((m: any, i: number) => {
+              const pct = (m.total_price / topMatMax) * 100;
+              const rankColors = ['#FFB300', '#C0C0C0', '#CD7F32', 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0.2)'];
+              return (
+                <View key={i} style={s.topItem}>
+                  <View style={s.topLeft}>
+                    <View style={[s.topRank, i < 3 && { borderColor: rankColors[i], borderWidth: 1.5 }]}>
+                      <Text style={[s.topRankNum, i < 3 && { color: rankColors[i] }]}>{i + 1}</Text>
+                    </View>
+                    <View style={s.topInfo}>
+                      <Text style={s.topName} numberOfLines={1}>{m.name}</Text>
+                      <Text style={s.topMeta}>{m.count} dona · {m.total_sqm.toFixed(1)} kv.m</Text>
+                    </View>
+                  </View>
+                  <View style={s.topRight}>
+                    <Text style={s.topPrice}>{fmtMoney(Math.round(m.total_price * 100) / 100)}</Text>
+                    <View style={s.topBarBg}>
+                      <View style={[s.topBar, { width: `${pct}%` }]} />
+                    </View>
+                  </View>
                 </View>
-                <View style={s.topInfo}>
-                  <Text style={s.topName}>{m.name}</Text>
-                  <Text style={s.topMeta}>{m.count} dona · {m.total_sqm?.toFixed(1)} kv.m</Text>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Top Dealers */}
+        {reports?.top_dealers?.length > 0 && (
+          <View style={s.section}>
+            <View style={s.sH}><Users size={15} color={colors.accent} /><Text style={s.sTitle}>Top dilerlar</Text></View>
+            {reports.top_dealers.map((d: any, i: number) => (
+              <View key={i} style={s.dealerItem}>
+                <View style={s.dealerAvatar}><Text style={s.dealerAvatarText}>{d.name.charAt(0).toUpperCase()}</Text></View>
+                <View style={s.dealerInfo}>
+                  <Text style={s.dealerName}>{d.name}</Text>
+                  <Text style={s.dealerOrders}>{d.orders} ta buyurtma</Text>
                 </View>
-                <Text style={s.topPrice}>{formatPrice(Math.round(m.total_price * 100) / 100)}</Text>
+                <Text style={s.dealerRev}>{fmtMoney(d.revenue)}</Text>
               </View>
             ))}
           </View>
         )}
 
-        {/* Info Row */}
-        <View style={s.infoRow}>
+        {/* Quick Stats Grid */}
+        <View style={s.qGrid}>
           {[
-            { icon: Users, val: stats?.total_dealers || 0, label: 'Dilerlar', color: '#6C63FF' },
-            { icon: Wrench, val: stats?.total_workers || 0, label: 'Ishchilar', color: '#448AFF' },
-            { icon: Boxes, val: stats?.total_materials || 0, label: 'Materiallar', color: '#FFB300' },
-            { icon: XCircle, val: stats?.rejected_orders || 0, label: 'Rad etilgan', color: '#FF5252' },
+            { icon: ShoppingCart, val: fmtNum(stats?.total_orders || 0), label: 'Jami buyurtma', color: colors.accent },
+            { icon: Users, val: fmtNum(stats?.total_dealers || 0), label: 'Dilerlar', color: '#29B6F6' },
+            { icon: Wrench, val: fmtNum(stats?.total_workers || 0), label: 'Ishchilar', color: '#FFB300' },
+            { icon: Boxes, val: fmtNum(stats?.total_materials || 0), label: 'Materiallar', color: '#00E676' },
           ].map((c, i) => (
-            <View key={i} style={s.infoCard}>
-              <c.icon size={18} color={c.color} />
-              <Text style={s.infoVal}>{c.val}</Text>
-              <Text style={s.infoLabel}>{c.label}</Text>
+            <View key={i} style={s.qCard}>
+              <View style={[s.qIcon, { backgroundColor: c.color + '12' }]}><c.icon size={18} color={c.color} /></View>
+              <Text style={s.qVal}>{c.val}</Text>
+              <Text style={s.qLabel}>{c.label}</Text>
             </View>
           ))}
         </View>
+
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* Profile Modal */}
       <Modal visible={showProfile} transparent animationType="slide">
         <View style={s.modalBg}><View style={s.modal}>
-          <View style={s.modalH}>
-            <Text style={s.modalTitle}>Profil sozlamalari</Text>
-            <TouchableOpacity onPress={() => setShowProfile(false)}>
-              <X size={22} color="rgba(255,255,255,0.4)" />
-            </TouchableOpacity>
-          </View>
+          <View style={s.modalH}><Text style={s.modalTitle}>Profil sozlamalari</Text><TouchableOpacity onPress={() => setShowProfile(false)}><X size={22} color="rgba(255,255,255,0.4)" /></TouchableOpacity></View>
           <ScrollView style={s.modalBody}>
-            {profileMsg ? <View style={s.successBox}><Text style={s.successText}>{profileMsg}</Text></View> : null}
-            {profileErr ? <View style={s.errorBox}><Text style={s.errorText}>{profileErr}</Text></View> : null}
+            {profileMsg ? <View style={s.okBox}><Text style={s.okText}>{profileMsg}</Text></View> : null}
+            {profileErr ? <View style={s.errBox}><Text style={s.errText}>{profileErr}</Text></View> : null}
             <Text style={s.label}>Yangi Email</Text>
-            <TextInput style={s.modalInput} value={profileForm.email} onChangeText={v => setProfileForm({...profileForm, email: v})} placeholder="email@..." placeholderTextColor="rgba(255,255,255,0.2)" autoCapitalize="none" keyboardType="email-address" />
+            <TextInput style={s.input} value={profileForm.email} onChangeText={v => setProfileForm({...profileForm, email: v})} placeholder="email@..." placeholderTextColor="rgba(255,255,255,0.2)" autoCapitalize="none" keyboardType="email-address" />
             <Text style={s.label}>Yangi Parol</Text>
-            <TextInput style={s.modalInput} value={profileForm.password} onChangeText={v => setProfileForm({...profileForm, password: v})} placeholder="Yangi parol" placeholderTextColor="rgba(255,255,255,0.2)" secureTextEntry />
+            <TextInput style={s.input} value={profileForm.password} onChangeText={v => setProfileForm({...profileForm, password: v})} placeholder="Yangi parol" placeholderTextColor="rgba(255,255,255,0.2)" secureTextEntry />
             <Text style={[s.label, { marginTop: 24, color: colors.warning }]}>Joriy Parol (majburiy)</Text>
-            <TextInput style={[s.modalInput, { borderColor: 'rgba(255,179,0,0.3)' }]} value={profileForm.current_password} onChangeText={v => setProfileForm({...profileForm, current_password: v})} placeholder="Joriy parol" placeholderTextColor="rgba(255,255,255,0.2)" secureTextEntry />
+            <TextInput style={[s.input, { borderColor: 'rgba(255,179,0,0.3)' }]} value={profileForm.current_password} onChangeText={v => setProfileForm({...profileForm, current_password: v})} placeholder="Joriy parol" placeholderTextColor="rgba(255,255,255,0.2)" secureTextEntry />
             <TouchableOpacity style={s.saveBtn} onPress={saveProfile} disabled={profileLoading}>
               {profileLoading ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>Saqlash</Text>}
             </TouchableOpacity>
@@ -245,75 +265,101 @@ export default function AdminDashboard() {
 
 const s = StyleSheet.create({
   c: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
-  hi: { fontSize: 13, color: colors.textSec, fontWeight: '500' },
-  name: { fontSize: 24, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
-  headerBtns: { flexDirection: 'row', gap: 8 },
-  headerBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.cardBorder },
-  scroll: { paddingHorizontal: 16, paddingBottom: 100 },
 
-  // Alert Banner
-  alertBanner: { backgroundColor: 'rgba(255,82,82,0.06)', borderRadius: 18, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,82,82,0.12)' },
-  alertHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  alertTitle: { fontSize: 13, fontWeight: '700', color: '#FF5252', textTransform: 'uppercase', letterSpacing: 0.5 },
-  alertItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(255,82,82,0.06)' },
-  alertItemName: { fontSize: 14, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
-  alertItemStock: { fontSize: 14, fontWeight: '700', color: '#FFB300' },
+  // Header
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6 },
+  greeting: { fontSize: 12, color: 'rgba(255,255,255,0.3)', fontWeight: '500', letterSpacing: 0.5 },
+  name: { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.5, marginTop: 1 },
+  hBtns: { flexDirection: 'row', gap: 6 },
+  hBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.04)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
 
-  // Revenue Cards
-  revenueRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  revenueCard: { flex: 1, borderRadius: 20, overflow: 'hidden' },
-  revenueGrad: { padding: 16, gap: 4 },
-  revenueLabel: { fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  revenueVal: { fontSize: 22, fontWeight: '800', color: '#fff', marginTop: 4 },
-  revenueSub: { fontSize: 11, color: 'rgba(255,255,255,0.5)' },
+  scroll: { paddingHorizontal: 16, paddingTop: 8 },
 
-  // Status Grid
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
-  statCard: { width: '48%', flexGrow: 1, backgroundColor: colors.card, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: colors.cardBorder, gap: 6 },
-  statIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  statVal: { fontSize: 26, fontWeight: '800', color: '#fff' },
-  statLabel: { fontSize: 10, color: colors.textSec, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' },
+  // Alert
+  alert: { backgroundColor: 'rgba(255,82,82,0.05)', borderRadius: 16, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(255,82,82,0.1)' },
+  alertH: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  alertTitle: { fontSize: 11, fontWeight: '700', color: '#FF5252', textTransform: 'uppercase', letterSpacing: 1 },
+  alertRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  alertName: { fontSize: 13, color: 'rgba(255,255,255,0.6)' },
+  alertQty: { fontSize: 13, fontWeight: '700', color: '#FFB300' },
+
+  // Hero
+  hero: { borderRadius: 24, padding: 22, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(108,99,255,0.1)' },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  heroIconWrap: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(108,99,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  heroLabel: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+  heroValue: { fontSize: 36, fontWeight: '800', color: '#fff', letterSpacing: -1, marginBottom: 2 },
+  heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 16 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 16, padding: 14 },
+  heroPill: { flex: 1, flexDirection: 'column', alignItems: 'center', gap: 4 },
+  heroPillLabel: { fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  heroPillVal: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  heroDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.06)' },
+
+  // Section
+  section: { backgroundColor: 'rgba(255,255,255,0.025)', borderRadius: 20, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  sH: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  sTitle: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  // Pipeline
+  pipeline: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  pipeItem: { width: '31%', flexGrow: 1, alignItems: 'center', paddingVertical: 12, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 14, gap: 6 },
+  pipeIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  pipeVal: { fontSize: 22, fontWeight: '800', color: 'rgba(255,255,255,0.25)', fontVariant: ['tabular-nums'] },
+  pipeLabel: { fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 },
+  rejectedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' },
+  rejectedText: { fontSize: 12, color: colors.danger },
 
   // Chart
-  chartSection: { backgroundColor: colors.card, borderRadius: 20, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: colors.cardBorder },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  chartRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 120 },
-  chartCol: { alignItems: 'center', flex: 1, gap: 4 },
-  chartVal: { fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: '600' },
-  chartBarWrap: { width: 20, height: 80, justifyContent: 'flex-end', borderRadius: 10, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.03)' },
-  chartBar: { width: '100%', backgroundColor: colors.accent, borderRadius: 10, minHeight: 4 },
-  chartDay: { fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: '600' },
+  chart: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 160, gap: 4 },
+  chartCol: { flex: 1, alignItems: 'center', gap: 3 },
+  chartMoney: { fontSize: 8, color: 'rgba(108,99,255,0.8)', fontWeight: '700', fontVariant: ['tabular-nums'] },
+  chartCount: { fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: '700', fontVariant: ['tabular-nums'] },
+  chartBarBg: { width: '100%', maxWidth: 28, height: 100, justifyContent: 'flex-end', borderRadius: 14, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.02)' },
+  chartBar: { width: '100%', borderRadius: 14, minHeight: 4 },
+  chartDay: { fontSize: 9, color: 'rgba(255,255,255,0.2)', fontWeight: '600', fontVariant: ['tabular-nums'], marginTop: 2 },
 
   // Top Materials
-  topSection: { backgroundColor: colors.card, borderRadius: 20, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: colors.cardBorder },
-  topItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)' },
-  topRank: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center' },
-  topRankText: { fontSize: 12, fontWeight: '800', color: 'rgba(255,255,255,0.4)' },
+  topItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' },
+  topLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  topRank: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.03)', alignItems: 'center', justifyContent: 'center' },
+  topRankNum: { fontSize: 12, fontWeight: '800', color: 'rgba(255,255,255,0.25)', fontVariant: ['tabular-nums'] },
   topInfo: { flex: 1 },
   topName: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  topMeta: { fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 },
-  topPrice: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  topMeta: { fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2, fontVariant: ['tabular-nums'] },
+  topRight: { alignItems: 'flex-end', minWidth: 90 },
+  topPrice: { fontSize: 14, fontWeight: '800', color: '#fff', fontVariant: ['tabular-nums'] },
+  topBarBg: { width: 80, height: 3, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 2, marginTop: 6, overflow: 'hidden' },
+  topBar: { height: '100%', backgroundColor: '#6C63FF', borderRadius: 2 },
 
-  // Info Row
-  infoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  infoCard: { width: '48%', flexGrow: 1, backgroundColor: colors.card, borderRadius: 18, padding: 14, gap: 6, borderWidth: 1, borderColor: colors.cardBorder },
-  infoVal: { fontSize: 20, fontWeight: '700', color: '#fff' },
-  infoLabel: { fontSize: 11, color: colors.textSec, fontWeight: '500' },
+  // Dealers
+  dealerItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' },
+  dealerAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(108,99,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  dealerAvatarText: { fontSize: 16, fontWeight: '800', color: colors.accent },
+  dealerInfo: { flex: 1 },
+  dealerName: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  dealerOrders: { fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2, fontVariant: ['tabular-nums'] },
+  dealerRev: { fontSize: 15, fontWeight: '800', color: '#fff', fontVariant: ['tabular-nums'] },
+
+  // Quick Grid
+  qGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  qCard: { width: '48%', flexGrow: 1, backgroundColor: 'rgba(255,255,255,0.025)', borderRadius: 18, padding: 16, gap: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' },
+  qIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  qVal: { fontSize: 28, fontWeight: '800', color: '#fff', fontVariant: ['tabular-nums'] },
+  qLabel: { fontSize: 10, color: 'rgba(255,255,255,0.3)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
 
   // Modal
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
   modal: { backgroundColor: '#0a0a0f', borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', maxHeight: '80%' },
   modalH: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 22, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: '#fff' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
   modalBody: { padding: 22, paddingBottom: 40 },
-  label: { fontSize: 11, color: colors.textSec, marginBottom: 6, marginTop: 14, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '600' },
-  modalInput: { height: 52, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 16, borderWidth: 1, borderColor: colors.cardBorder, paddingHorizontal: 18, fontSize: 15, color: '#fff' },
-  saveBtn: { height: 56, backgroundColor: colors.accent, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  successBox: { backgroundColor: colors.successSoft, borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(0,230,118,0.2)' },
-  successText: { color: colors.success, fontSize: 13, textAlign: 'center', fontWeight: '600' },
-  errorBox: { backgroundColor: colors.dangerSoft, borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,82,82,0.2)' },
-  errorText: { color: colors.danger, fontSize: 13, textAlign: 'center' },
+  label: { fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 6, marginTop: 14, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '600' },
+  input: { height: 50, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 16, fontSize: 15, color: '#fff' },
+  saveBtn: { height: 52, backgroundColor: colors.accent, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
+  saveBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  okBox: { backgroundColor: 'rgba(0,230,118,0.06)', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(0,230,118,0.15)' },
+  okText: { color: colors.success, fontSize: 13, textAlign: 'center', fontWeight: '600' },
+  errBox: { backgroundColor: 'rgba(255,82,82,0.06)', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,82,82,0.15)' },
+  errText: { color: colors.danger, fontSize: 13, textAlign: 'center' },
 });
