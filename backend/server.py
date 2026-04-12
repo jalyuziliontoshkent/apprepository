@@ -43,8 +43,19 @@ def load_database_url() -> str:
             "Yoki Supabase'dan 'Connection string' ni to'liq nusxalang."
         )
     hn = str(host).strip().lower()
+    # Railway/Render da ko'pincha hujjatdan "..." yoki [YOUR-PASSWORD] nusxalanadi
+    if hn == "..." or hn.startswith("...") or "..." in hn:
+        raise RuntimeError(
+            "DATABASE_URL ichida hostname o'rniga '...' qolgan (namuna matn). "
+            "Railway → Variables → DATABASE_URL: Supabase → Project Settings → Database → "
+            "Connection string → URI (Transaction pooler, port 6543) ni BUTUNLAY nusxalang. "
+            "Hech qayerda ... yoki [YOUR-PASSWORD] qoldirmang."
+        )
     if hn.startswith(".") or ".." in hn or hn.startswith("@"):
-        raise RuntimeError(f"DATABASE_URL hostname noto'g'ri: {host!r}. Qator boshidagi nuqta yoki @ yo'qolgan.")
+        raise RuntimeError(
+            f"DATABASE_URL hostname noto'g'ri: {host!r}. "
+            "URL noto'g'ri kesilgan yoki boshida nuqta bor — Supabase URI ni qayta nusxalang."
+        )
     return url
 
 
