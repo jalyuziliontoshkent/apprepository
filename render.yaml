@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: lion-blinds-backend
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        value: postgresql://postgres.rgqgefqmuwqeritnxely:Farrux_12072009@aws-1-ap-south-1.pooler.supabase.com:6543/postgres
+      - key: JWT_SECRET
+        value: lion_blinds_super_secret_2026

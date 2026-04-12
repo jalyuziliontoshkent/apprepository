@@ -1,0 +1,12 @@
+aiofiles
+asyncpg
+bcrypt
+fastapi
+httpx
+openpyxl
+python-dotenv
+python-jose
+PyJWT
+python-multipart
+starlette
+uvicorn
