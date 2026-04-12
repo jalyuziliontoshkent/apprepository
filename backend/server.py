@@ -62,20 +62,25 @@ def load_database_url() -> str:
 
 
 def asyncpg_ssl_context_for_dsn(dsn: str) -> Optional[ssl.SSLContext]:
-    """Supabase uchun TLS; Railway/konteynerda tizim CA yetmasa certifi ishlatiladi."""
+    """
+    Supabase pooler: Railway/Render yo'lida CA zanjiri ba'zan 'self-signed in chain' beradi.
+    Standart: TLS shifrlangan, lekin server sertifikati tekshirilmaydi (asyncpg + bulut uchun odatiy yechim).
+    Qat'iy tekshiruv: ASYNCPG_STRICT_SSL=1 (mahalliy/yaxshi tarmoq).
+    """
     try:
         h = (urlparse(dsn.replace("postgres://", "postgresql://", 1)).hostname or "").lower()
     except Exception:
         return None
     if "supabase.co" not in h:
         return None
-    if os.environ.get("ASYNCPG_INSECURE_SSL", "").strip().lower() in ("1", "true", "yes"):
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        logger.warning("ASYNCPG_INSECURE_SSL: sertifikat tekshiruvi o'chiq (faqat muammo bo'lsa)")
-        return ctx
-    return ssl.create_default_context(cafile=certifi.where())
+    strict = os.environ.get("ASYNCPG_STRICT_SSL", "").strip().lower() in ("1", "true", "yes")
+    if strict:
+        return ssl.create_default_context(cafile=certifi.where())
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    logger.info("Postgres (Supabase): TLS yoqilgan, sertifikat verify o'chiq (pooler + bulut muvofiqligi)")
+    return ctx
 
 
 def asyncpg_pool_kwargs():
