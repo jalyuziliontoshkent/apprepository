@@ -2,12 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { useAppStore } from '../src/utils/store';
 import { api as apiClient } from '../src/services/apiClient';
 import { initMonitoring } from '../src/services/monitoring';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { OfflineBanner } from '../src/components/OfflineBanner';
 import { registerForPushNotifications } from '../src/services/notifications';
 
 export const api = apiClient;
@@ -97,8 +99,13 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#050505' }, animation: 'fade' }} />
+      <SafeAreaProvider>
+        <View style={{ flex: 1, backgroundColor: '#050505' }}>
+          <OfflineBanner />
+          <StatusBar style="light" />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#050505' }, animation: 'fade' }} />
+        </View>
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }

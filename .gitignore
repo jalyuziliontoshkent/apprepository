@@ -31,6 +31,10 @@ dist/
 dist
 
 # Environment files (comprehensive coverage)
+.env
+backend/.env
+frontend/.env
+!**/.env.example
 
 *token.json*
 *credentials.json*
@@ -75,6 +79,11 @@ agenthub/agents/youtube/db
 
 # Build caches
 .cache/
+frontend/.metro-cache/
+
+# EAS / build artifacts (loglar repoga kerak emas)
+frontend/build_detail.txt
+frontend/last_build*.json
 
 memory/test_credentials.md
 # Mobile development

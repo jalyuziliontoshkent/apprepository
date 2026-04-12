@@ -28,7 +28,11 @@ export default function AdminOrders() {
   const [exporting, setExporting] = useState(false);
 
   const fetchOrders = useCallback(async () => {
-    try { setOrders(await api('/orders')); } catch (e) { console.error(e); }
+    try {
+      setOrders(await api('/orders', { cacheKey: 'admin-orders', cacheTtlMs: 20_000 }));
+    } catch (e) {
+      console.error(e);
+    }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
   useEffect(() => { fetchOrders(); }, []);

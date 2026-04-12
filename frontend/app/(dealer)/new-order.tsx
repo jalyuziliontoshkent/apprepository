@@ -31,7 +31,10 @@ export default function NewOrder() {
   const [selectedCat, setSelectedCat] = useState<any>(null);
 
   useEffect(() => {
-    Promise.all([api('/categories'), api('/materials')])
+    Promise.all([
+      api('/categories', { cacheKey: 'categories', cacheTtlMs: 60_000 }),
+      api('/materials', { cacheKey: 'materials', cacheTtlMs: 60_000 }),
+    ])
       .then(([cats, mats]) => { setCategories(cats); setMaterials(mats); })
       .catch(console.error).finally(() => setLoading(false));
   }, []);

@@ -1,13 +1,17 @@
+# Bitta Git repodan Render da deploy (Blueprint yoki Web Service).
+# Maxfiy qiymatlarni Git ga qo‘ymang — Render Dashboard da qo‘shing (sync: false).
+
 services:
   - type: web
     name: lion-blinds-backend
-    env: python
+    runtime: python
     region: singapore
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn backend.server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
-        value: postgresql://postgres.rgqgefqmuwqeritnxely:Farrux_12072009@aws-1-ap-south-1.pooler.supabase.com:6543/postgres
+        sync: false
       - key: JWT_SECRET
-        value: lion_blinds_super_secret_2026
+        sync: false

@@ -28,7 +28,10 @@ export default function DealersScreen() {
   const [formLoading, setFormLoading] = useState(false);
 
   const fetchDealers = useCallback(async () => {
-    try { const data = await api('/dealers'); setDealers(data); }
+    try {
+      const data = await api('/dealers', { cacheKey: 'admin-dealers', cacheTtlMs: 30_000 });
+      setDealers(data);
+    }
     catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
@@ -75,7 +78,10 @@ export default function DealersScreen() {
     setSelectedDealer(dealer);
     setShowHistory(true);
     try {
-      const data = await api(`/dealers/${dealer.id}/payments`);
+      const data = await api(`/dealers/${dealer.id}/payments`, {
+        cacheKey: `admin-dealer-payments-${dealer.id}`,
+        cacheTtlMs: 30_000,
+      });
       setPaymentHistory(data);
     } catch { setPaymentHistory([]); }
   };

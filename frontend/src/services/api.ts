@@ -1,12 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getCache, setCache } from './cache';
+import { getCache, getStaleCache, setCache } from './cache';
 import { ApiError, mapHttpError } from './errors';
 import { trackApiFailure, trackApiSuccess } from './telemetry';
 
-const API_TIMEOUT_MS = 8000;
+/** Render uyg‘onguncha 30–60s kutishi mumkin — qisqa timeout telefonda "tarmoq xatosi". */
+const API_TIMEOUT_MS = 55_000;
 const TOKEN_CACHE_TTL_MS = 5000;
-const DEFAULT_RETRIES = 1;
-const RETRY_DELAY_MS = 250;
+const DEFAULT_RETRIES = 2;
+const RETRY_DELAY_MS = 800;
 
 type RequestOptions = RequestInit & {
   timeoutMs?: number;
@@ -24,18 +25,31 @@ const getAuthToken = async () => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const shouldRetry = (error: unknown, method: string, attempt: number, retries: number) => {
-  if (method !== 'GET') return false;
+const shouldRetry = (
+  error: unknown,
+  method: string,
+  attempt: number,
+  retries: number,
+  path: string,
+) => {
   if (attempt >= retries) return false;
-  if (error instanceof ApiError) {
-    return error.code === 'TIMEOUT' || error.code === 'NETWORK' || error.code === 'SERVER';
-  }
-  return true;
+  if (!(error instanceof ApiError)) return false;
+  const retryable = error.code === 'TIMEOUT' || error.code === 'NETWORK' || error.code === 'SERVER';
+  if (!retryable) return false;
+  if (method === 'GET') return true;
+  if (method === 'POST' && path.startsWith('/auth/')) return true;
+  return false;
 };
 
 const parseError = async (res: Response) => {
   const fallback = 'Xatolik yuz berdi';
-  const err = await res.json().catch(() => ({ detail: fallback }));
+  let err: { detail?: string } = { detail: fallback };
+  try {
+    const text = await res.text();
+    if (text) err = JSON.parse(text);
+  } catch {
+    /* HTML yoki bo‘sh javob (masalan Render 502) */
+  }
   const message = typeof err?.detail === 'string' ? err.detail : fallback;
   return mapHttpError(res.status, message, err);
 };
@@ -63,17 +77,29 @@ const executeRequest = async (baseUrl: string, path: string, options: RequestOpt
 
       if (!res.ok) throw await parseError(res);
       trackApiSuccess(Date.now() - startedAt);
-      const data = await res.json();
-      // Auto-update token logic not needed when reading directly from AsyncStorage
-      
+      const text = await res.text();
+      let data: unknown;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        throw new ApiError('Server javobi noto‘g‘ri formatda', 'SERVER', res.status);
+      }
       return data;
     } catch (error: any) {
       const normalized =
         error?.name === 'AbortError'
-          ? new ApiError("So'rov timeout bo'ldi", 'TIMEOUT')
+          ? new ApiError(
+              "Server javob bermadi (juda uzoq kutildi). Internetni tekshiring yoki birozdan keyin qayta urinib ko'ring.",
+              'TIMEOUT',
+            )
           : error instanceof ApiError
           ? error
-          : new ApiError('Tarmoq xatosi', 'NETWORK');
+          : new ApiError(
+              error?.message && typeof error.message === 'string' && error.message !== 'Network request failed'
+                ? error.message
+                : "Serverga ulanib bo'lmadi. Internet yoki server holatini tekshiring.",
+              'NETWORK',
+            );
 
       if (normalized.code === 'UNAUTHORIZED') {
         await AsyncStorage.multiRemove(['token', 'user']).catch(() => undefined);
@@ -83,8 +109,8 @@ const executeRequest = async (baseUrl: string, path: string, options: RequestOpt
       }
 
       trackApiFailure(Date.now() - startedAt);
-      if (shouldRetry(normalized, method, attempt, retries)) {
-        await sleep(RETRY_DELAY_MS * (attempt + 1));
+      if (shouldRetry(normalized, method, attempt, retries, path)) {
+        await sleep(RETRY_DELAY_MS * Math.pow(2, attempt));
         continue;
       }
       throw normalized;
@@ -128,6 +154,17 @@ export const createApi = (baseUrl?: string) => {
     if (dedupKey) pendingGetRequests.set(dedupKey, reqPromise);
     try {
       return await reqPromise;
+    } catch (e) {
+      if (
+        isGet &&
+        cacheKey &&
+        e instanceof ApiError &&
+        (e.code === 'NETWORK' || e.code === 'TIMEOUT' || e.code === 'SERVER')
+      ) {
+        const stale = await getStaleCache<T>(cacheKey);
+        if (stale !== null) return stale;
+      }
+      throw e;
     } finally {
       if (dedupKey) pendingGetRequests.delete(dedupKey);
     }

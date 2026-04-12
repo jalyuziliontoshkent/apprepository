@@ -22,7 +22,21 @@ export default function AdminWorkers() {
   const [dForm, setDForm] = useState({ driver_name: '', driver_phone: '', plate_number: '' });
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
-  const fetchAll = useCallback(async () => { try { const [w, o] = await Promise.all([api('/workers'), api('/orders')]); setWorkers(w); setOrders(o.filter((x: any) => ['tasdiqlangan','tayyorlanmoqda','tayyor','yetkazilmoqda'].includes(x.status))); } catch (e) { console.error(e); } finally { setLoading(false); setRefreshing(false); } }, []);
+  const fetchAll = useCallback(async () => {
+    try {
+      const [w, o] = await Promise.all([
+        api('/workers', { cacheKey: 'admin-workers', cacheTtlMs: 30_000 }),
+        api('/orders', { cacheKey: 'admin-orders', cacheTtlMs: 20_000 }),
+      ]);
+      setWorkers(w);
+      setOrders(o.filter((x: any) => ['tasdiqlangan', 'tayyorlanmoqda', 'tayyor', 'yetkazilmoqda'].includes(x.status)));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
   useEffect(() => { fetchAll(); }, []);
   const addWorker = async () => { if (!wForm.name || !wForm.email || !wForm.password) return; try { await api('/workers', { method: 'POST', body: JSON.stringify(wForm) }); setShowAddWorker(false); setWForm({ name: '', email: '', password: '', phone: '', specialty: '' }); fetchAll(); } catch (e) { console.error(e); } };
   const assignItem = async (orderId: string, itemIdx: number, workerId: string) => { try { await api(`/orders/${orderId}/items/${itemIdx}/assign`, { method: 'PUT', body: JSON.stringify({ worker_id: workerId }) }); fetchAll(); } catch (e) { console.error(e); } };

@@ -30,3 +30,18 @@ export const setCache = async <T>(key: string, value: T, ttlMs: number) => {
     // Non-critical path: ignore cache write failures.
   }
 };
+
+/** Last stored value even if TTL expired — for offline / network errors. */
+export const getStaleCache = async <T>(key: string): Promise<T | null> => {
+  try {
+    const raw = await AsyncStorage.getItem(keyOf(key));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CacheEntry<T>;
+    if (parsed && Object.prototype.hasOwnProperty.call(parsed, 'value')) {
+      return parsed.value as T;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};

@@ -29,7 +29,14 @@ export default function AdminInventory() {
   const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
   const fetchData = useCallback(async () => {
-    try { const [cats, mats] = await Promise.all([api('/categories'), api('/materials')]); setCategories(cats); setMaterials(mats); }
+    try {
+      const [cats, mats] = await Promise.all([
+        api('/categories', { cacheKey: 'categories', cacheTtlMs: 60_000 }),
+        api('/materials', { cacheKey: 'materials', cacheTtlMs: 60_000 }),
+      ]);
+      setCategories(cats);
+      setMaterials(mats);
+    }
     catch (e) { console.error(e); } finally { setLoading(false); setRefreshing(false); }
   }, []);
   useEffect(() => { fetchData(); }, []);
