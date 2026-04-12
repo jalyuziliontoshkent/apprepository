@@ -69,12 +69,12 @@ pool: asyncpg.Pool = None
 async def get_pool() -> asyncpg.Pool:
     global pool
     if pool is None:
-        pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
+        pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10, statement_cache_size=0)
     return pool
 
 # ─── Helpers ───
 def get_jwt_secret(): return os.environ["JWT_SECRET"]
-def hash_password(pw: str) -> str: return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+def hash_password(pw: str) -> str: return bcrypt.hashpw(pw.encode(), bcrypt.gensalt(4)).decode()
 def verify_password(plain: str, hashed: str) -> bool: return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 def create_access_token(uid: str, email: str, role: str) -> str:
@@ -90,25 +90,39 @@ def row_to_dict(row):
 
 async def get_current_user(request: Request) -> dict:
     auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "): raise HTTPException(401, "Not authenticated")
+    if not auth.startswith("Bearer "): 
+        logger.error("Auth error: Missing or invalid Authorization header")
+        raise HTTPException(401, "Not authenticated")
     try:
         p = jwt.decode(auth[7:], get_jwt_secret(), algorithms=[JWT_ALGORITHM])
         try:
             user_id = int(p["sub"])
         except (ValueError, TypeError):
             raise HTTPException(401, "Invalid token format - please login again")
+            
+        cache_key = f"user_auth_{user_id}"
+        cached_user = cache.get(cache_key)
+        if cached_user:
+            return cached_user
+            
         db = await get_pool()
         row = await db.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
         if not row: raise HTTPException(401, "User not found")
         user = row_to_dict(row)
         user["id"] = str(user["id"])
         user.pop("password_hash", None)
+        
+        cache.set(cache_key, user, 60) # 1 minut xotirada saqlash
         return user
-    except jwt.ExpiredSignatureError: raise HTTPException(401, "Token expired")
-    except jwt.InvalidTokenError: raise HTTPException(401, "Invalid token")
+    except jwt.ExpiredSignatureError: 
+        logger.error("Auth error: Token expired")
+        raise HTTPException(401, "Token expired")
+    except jwt.InvalidTokenError as e: 
+        logger.error(f"Auth error: Invalid token {e}")
+        raise HTTPException(401, "Invalid token")
     except HTTPException: raise
     except Exception as e:
-        logger.error(f"Auth error: {e}")
+        logger.error(f"Auth error (other): {e}")
         raise HTTPException(401, "Authentication failed")
 
 async def require_admin(request: Request) -> dict:
@@ -164,7 +178,14 @@ async def get_exchange_rate():
 async def login(req: LoginReq):
     db = await get_pool()
     user = await db.fetchrow("SELECT * FROM users WHERE email = $1", req.email.strip().lower())
-    if not user or not verify_password(req.password, user["password_hash"]):
+    
+    if not user:
+        raise HTTPException(401, "Email yoki parol noto'g'ri")
+        
+    loop = asyncio.get_running_loop()
+    is_valid = await loop.run_in_executor(None, verify_password, req.password, user["password_hash"])
+    
+    if not is_valid:
         raise HTTPException(401, "Email yoki parol noto'g'ri")
     token = create_access_token(str(user["id"]), user["email"], user["role"])
     u = row_to_dict(user)
@@ -1115,7 +1136,7 @@ async def keep_alive_task():
 @app.on_event("startup")
 async def startup():
     global pool
-    pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
+    pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10, statement_cache_size=0)
     async with pool.acquire() as conn:
         await create_tables(conn)
         await seed_admin(conn)
