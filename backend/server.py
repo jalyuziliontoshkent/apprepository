@@ -10,6 +10,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 import asyncpg, aiofiles, uuid, asyncio, io
 import os, logging, bcrypt, jwt, secrets, string, json
+import ssl
+import certifi
 import httpx
 from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
@@ -59,22 +61,28 @@ def load_database_url() -> str:
     return url
 
 
-def asyncpg_ssl_for_dsn(dsn: str):
-    """Supabase pooler SSL talab qiladi; mahalliy postgres uchun o'chiq."""
+def asyncpg_ssl_context_for_dsn(dsn: str) -> Optional[ssl.SSLContext]:
+    """Supabase uchun TLS; Railway/konteynerda tizim CA yetmasa certifi ishlatiladi."""
     try:
         h = (urlparse(dsn.replace("postgres://", "postgresql://", 1)).hostname or "").lower()
     except Exception:
         return None
-    if "supabase.co" in h:
-        return True
-    return None
+    if "supabase.co" not in h:
+        return None
+    if os.environ.get("ASYNCPG_INSECURE_SSL", "").strip().lower() in ("1", "true", "yes"):
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        logger.warning("ASYNCPG_INSECURE_SSL: sertifikat tekshiruvi o'chiq (faqat muammo bo'lsa)")
+        return ctx
+    return ssl.create_default_context(cafile=certifi.where())
 
 
 def asyncpg_pool_kwargs():
     kw = dict(min_size=2, max_size=10, statement_cache_size=0)
-    ssl = asyncpg_ssl_for_dsn(DATABASE_URL)
-    if ssl is not None:
-        kw["ssl"] = ssl
+    ctx = asyncpg_ssl_context_for_dsn(DATABASE_URL)
+    if ctx is not None:
+        kw["ssl"] = ctx
     return kw
 
 
