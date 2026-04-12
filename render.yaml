@@ -11,6 +11,9 @@ services:
     startCommand: uvicorn backend.server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
+      # 3.14 hali nozik; 3.12 barqaror (https://render.com/docs/python-version)
+      - key: PYTHON_VERSION
+        value: "3.12.8"
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET

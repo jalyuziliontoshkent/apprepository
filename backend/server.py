@@ -11,6 +11,7 @@ from starlette.middleware.cors import CORSMiddleware
 import asyncpg, aiofiles, uuid, asyncio, io
 import os, logging, bcrypt, jwt, secrets, string, json
 import httpx
+from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 from typing import List, Optional
@@ -20,7 +21,53 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = os.environ['DATABASE_URL']
+
+def load_database_url() -> str:
+    """Render/Supabase uchun DSN: bo'sh hostname va IDNA xatolarini oldini oladi."""
+    raw = os.environ.get("DATABASE_URL")
+    if raw is None or not str(raw).strip():
+        raise RuntimeError(
+            "DATABASE_URL yo'q yoki bo'sh. Render → Environment → DATABASE_URL qo'shing "
+            "(Supabase → Database → URI, Transaction pooler, port 6543)."
+        )
+    url = str(raw).strip()
+    if len(url) >= 2 and url[0] == url[-1] and url[0] in "\"'":
+        url = url[1:-1].strip()
+    url = url.lstrip("\ufeff\u200b\u200c\u200d").strip()
+    parsed = urlparse(url.replace("postgres://", "postgresql://", 1))
+    host = parsed.hostname
+    if not host or not str(host).strip():
+        raise RuntimeError(
+            "DATABASE_URL da HOSTNAME bo'sh (noto'g'ri URL). Odatda parolda @ : # % bo'lganda "
+            "URL-encoding qilinmagan: urllib.parse.quote_plus(parol) bilan almashtiring. "
+            "Yoki Supabase'dan 'Connection string' ni to'liq nusxalang."
+        )
+    hn = str(host).strip().lower()
+    if hn.startswith(".") or ".." in hn or hn.startswith("@"):
+        raise RuntimeError(f"DATABASE_URL hostname noto'g'ri: {host!r}. Qator boshidagi nuqta yoki @ yo'qolgan.")
+    return url
+
+
+def asyncpg_ssl_for_dsn(dsn: str):
+    """Supabase pooler SSL talab qiladi; mahalliy postgres uchun o'chiq."""
+    try:
+        h = (urlparse(dsn.replace("postgres://", "postgresql://", 1)).hostname or "").lower()
+    except Exception:
+        return None
+    if "supabase.co" in h:
+        return True
+    return None
+
+
+def asyncpg_pool_kwargs():
+    kw = dict(min_size=2, max_size=10, statement_cache_size=0)
+    ssl = asyncpg_ssl_for_dsn(DATABASE_URL)
+    if ssl is not None:
+        kw["ssl"] = ssl
+    return kw
+
+
+DATABASE_URL = load_database_url()
 
 UPLOAD_DIR = ROOT_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -69,7 +116,7 @@ pool: asyncpg.Pool = None
 async def get_pool() -> asyncpg.Pool:
     global pool
     if pool is None:
-        pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10, statement_cache_size=0)
+        pool = await asyncpg.create_pool(DATABASE_URL, **asyncpg_pool_kwargs())
     return pool
 
 # ─── Helpers ───
@@ -1136,7 +1183,7 @@ async def keep_alive_task():
 @app.on_event("startup")
 async def startup():
     global pool
-    pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10, statement_cache_size=0)
+    pool = await asyncpg.create_pool(DATABASE_URL, **asyncpg_pool_kwargs())
     async with pool.acquire() as conn:
         await create_tables(conn)
         await seed_admin(conn)
