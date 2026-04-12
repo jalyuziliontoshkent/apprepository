@@ -37,3 +37,10 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# EAS inspect / build artifacts (never commit)
+inspect-out/
+build_view.json
+last_build*.json
+build.log
+build_detail.txt

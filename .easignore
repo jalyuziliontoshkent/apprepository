@@ -13,3 +13,15 @@ frontend/.expo
 frontend/dist
 frontend/web-build
 .github
+
+# Mahalliy / Windows: arxiv ifloslanmasin; Linuxda tar extract xatolari (#3532)
+frontend/inspect-out
+frontend/inspect-out/**
+frontend/build_view.json
+frontend/build.log
+frontend/build_detail.txt
+frontend/last_build*.json
+frontend/*.log
+frontend/.env
+frontend/.env.local
+frontend/.env.example

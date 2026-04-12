@@ -10,9 +10,17 @@ node_modules
 last_build*.json
 build_detail.txt
 build_log*.txt
+build_view.json
 *_check.json
 eas_check.json
 pkg_check.json
+inspect-out
+inspect-out/**
+
+# Maxfiy: EAS env eas.json / dashboard orqali
+.env
+.env.local
+.env.example
 
 # Monorepo (frontend ichida emas)
 backend

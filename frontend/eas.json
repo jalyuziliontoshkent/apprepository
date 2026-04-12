@@ -1,7 +1,7 @@
 {
   "cli": {
     "appVersionSource": "local",
-    "requireCommit": false
+    "requireCommit": true
   },
   "build": {
     "development": {
