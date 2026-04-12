@@ -79,7 +79,7 @@ def asyncpg_ssl_context_for_dsn(dsn: str) -> Optional[ssl.SSLContext]:
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
-    logger.info("Postgres (Supabase): TLS yoqilgan, sertifikat verify o'chiq (pooler + bulut muvofiqligi)")
+    logger.debug("Supabase pooler: TLS (sertifikat verify o'chiq, bulut muvofiqligi)")
     return ctx
 
 
@@ -1198,11 +1198,11 @@ async def keep_alive_task():
             await asyncio.sleep(300)  # 5 daqiqa
             db = await get_pool()
             await db.fetchval("SELECT 1")
-            logger.info("🟢 Keep-alive ping → PostgreSQL OK")
+            logger.debug("Keep-alive: PostgreSQL OK")
         except asyncio.CancelledError:
             break
         except Exception as e:
-            logger.warning(f"🔴 Keep-alive ping xatolik: {e}")
+            logger.warning("Keep-alive ping xatolik: %s", e)
 
 @app.on_event("startup")
 async def startup():
@@ -1212,7 +1212,7 @@ async def startup():
         await create_tables(conn)
         await seed_admin(conn)
     asyncio.create_task(keep_alive_task())
-    logger.info("Server ishga tushdi! (PostgreSQL + Keep-Alive)")
+    logger.info("Muvaffaqiyat: API tayyor, PostgreSQL ulandi, keep-alive yoqildi (bu xato emas).")
 
 @app.on_event("shutdown")
 async def shutdown():
