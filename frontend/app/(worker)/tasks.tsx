@@ -12,7 +12,6 @@ import { useTheme, useCurrency } from '../../src/utils/theme';
 export default function WorkerTasks() {
   const c = useTheme();
   const s = useMemo(() => createStyles(c), [c]);
-  const { formatPrice } = useCurrency();
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,7 +29,7 @@ export default function WorkerTasks() {
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { fetchTasks(); }, []);
+  useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
   const completeTask = async (orderId: string, itemIdx: number) => {
     const key = `${orderId}-${itemIdx}`;

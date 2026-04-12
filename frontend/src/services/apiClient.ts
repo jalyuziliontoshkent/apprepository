@@ -1,7 +1,7 @@
 import { createApi } from './api';
 
-/** Render production — telefon buildida .env dagi 192.168.* ishlatilmasin. */
-const FALLBACK_PRODUCTION = 'https://lion-blinds-backend.onrender.com';
+/** Production API (Railway). Telefon buildida .env dagi 192.168.* ishlatilmasin. */
+const FALLBACK_PRODUCTION = 'https://web-production-cabff.up.railway.app';
 
 function isLikelyLanOrLocalhost(url: string): boolean {
   try {

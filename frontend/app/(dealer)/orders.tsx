@@ -24,7 +24,7 @@ export default function DealerOrders() {
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { fetchOrders(); }, []);
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
   const allStatuses = ['kutilmoqda','tasdiqlangan','tayyorlanmoqda','tayyor','yetkazilmoqda','yetkazildi'];
   const filteredOrders = orders.filter((order) => {

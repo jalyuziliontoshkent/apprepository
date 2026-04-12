@@ -7,10 +7,12 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "development",
       "env": {
+        "EAS_BUILD_NO_EXPO_GO_WARNING": "true",
         "EXPO_PUBLIC_SUPABASE_URL": "https://rgqgefqmuwqeritnxely.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJncWdlZnFtdXdxZXJpdG54ZWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NDMzMDMsImV4cCI6MjA5MTIxOTMwM30.rB5aDvnD2eSL4PYGXoGc1POhTikS-IZIraoekgE_dKU",
-        "EXPO_PUBLIC_BACKEND_URL": "https://lion-blinds-backend.onrender.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://web-production-cabff.up.railway.app"
       },
       "android": {
         "buildType": "apk"
@@ -18,10 +20,12 @@
     },
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
       "env": {
+        "EAS_BUILD_NO_EXPO_GO_WARNING": "true",
         "EXPO_PUBLIC_SUPABASE_URL": "https://rgqgefqmuwqeritnxely.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJncWdlZnFtdXdxZXJpdG54ZWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NDMzMDMsImV4cCI6MjA5MTIxOTMwM30.rB5aDvnD2eSL4PYGXoGc1POhTikS-IZIraoekgE_dKU",
-        "EXPO_PUBLIC_BACKEND_URL": "https://lion-blinds-backend.onrender.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://web-production-cabff.up.railway.app"
       },
       "android": {
         "buildType": "apk"
@@ -31,11 +35,18 @@
       }
     },
     "production": {
+      "extends": "preview",
+      "autoIncrement": true
+    },
+    "playstore": {
+      "distribution": "store",
+      "environment": "production",
       "autoIncrement": true,
       "env": {
+        "EAS_BUILD_NO_EXPO_GO_WARNING": "true",
         "EXPO_PUBLIC_SUPABASE_URL": "https://rgqgefqmuwqeritnxely.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJncWdlZnFtdXdxZXJpdG54ZWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NDMzMDMsImV4cCI6MjA5MTIxOTMwM30.rB5aDvnD2eSL4PYGXoGc1POhTikS-IZIraoekgE_dKU",
-        "EXPO_PUBLIC_BACKEND_URL": "https://lion-blinds-backend.onrender.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://web-production-cabff.up.railway.app"
       },
       "android": {
         "buildType": "app-bundle"
@@ -45,7 +56,7 @@
   "submit": {
     "production": {
       "android": {
-        "serviceAccountKeyPath": "./google-services.json",
+        "serviceAccountKeyPath": "./play-store-credentials.json",
         "track": "internal"
       }
     }

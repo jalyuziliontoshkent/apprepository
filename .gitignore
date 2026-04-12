@@ -84,6 +84,9 @@ frontend/.metro-cache/
 # EAS / build artifacts (loglar repoga kerak emas)
 frontend/build_detail.txt
 frontend/last_build*.json
+frontend/build_log*.txt
+frontend/*_check.json
+/status.txt
 
 memory/test_credentials.md
 # Mobile development

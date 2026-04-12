@@ -10,7 +10,6 @@ import { useTheme, useCurrency } from '../../src/utils/theme';
 export default function WorkerCompleted() {
   const c = useTheme();
   const s = useMemo(() => createStyles(c), [c]);
-  const { formatPrice } = useCurrency();
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -23,7 +22,7 @@ export default function WorkerCompleted() {
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { fetchTasks(); }, []);
+  useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
   if (loading) return <SafeAreaView style={s.c}><ActivityIndicator size="large" color={c.accent} style={{ flex: 1 }} /></SafeAreaView>;
 

@@ -62,7 +62,7 @@ export default function RootLayout() {
     initMonitoring();
     checkAuth();
     registerForPushNotifications();
-  }, []);
+  }, [checkAuth]);
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
@@ -86,7 +86,7 @@ export default function RootLayout() {
         router.replace('/(worker)/tasks');
       }
     }
-  }, [auth.user, auth.loading, segments]);
+  }, [auth.user, auth.loading, segments, router]);
 
   if (auth.loading) {
     return (

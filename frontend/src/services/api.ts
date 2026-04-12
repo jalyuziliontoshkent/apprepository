@@ -5,7 +5,6 @@ import { trackApiFailure, trackApiSuccess } from './telemetry';
 
 /** Render uyg‘onguncha 30–60s kutishi mumkin — qisqa timeout telefonda "tarmoq xatosi". */
 const API_TIMEOUT_MS = 55_000;
-const TOKEN_CACHE_TTL_MS = 5000;
 const DEFAULT_RETRIES = 2;
 const RETRY_DELAY_MS = 800;
 

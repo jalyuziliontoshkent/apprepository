@@ -4,7 +4,7 @@ import {
   Image, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Send, X, Check, Upload, Trash2, ChevronLeft, StickyNote, Package, FolderOpen } from 'lucide-react-native';
+import { Plus, Send, X, Check, Trash2, ChevronLeft, StickyNote, Package, FolderOpen } from 'lucide-react-native';
 import { api } from '../_layout';
 import { useTheme, useCurrency } from '../../src/utils/theme';
 
