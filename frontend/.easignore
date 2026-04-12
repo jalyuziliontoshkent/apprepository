@@ -1,7 +1,20 @@
+# Dependencies & caches
 node_modules
 .expo
 .next
+.metro-cache
+**/.metro-cache/**
+
+# Windows da qulflanishi mumkin bo'lgan / keraksiz fayllar (EAS tar xatosi)
 *.log
+last_build*.json
+build_detail.txt
+build_log*.txt
+*_check.json
+eas_check.json
+pkg_check.json
+
+# Monorepo (frontend ichida emas)
 backend
 .git
 .github
