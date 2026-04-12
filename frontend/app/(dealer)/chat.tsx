@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Send } from 'lucide-react-native';
@@ -11,12 +11,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function DealerChat() {
   const c = useTheme();
+  const styles = useMemo(() => createStyles(c), [c]);
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState('');
   const [adminId, setAdminId] = useState('');
   const [adminName, setAdminName] = useState('Admin');
+  const [appState, setAppState] = useState(AppState.currentState);
   const scrollRef = useRef<ScrollView>(null);
   const intervalRef = useRef<any>(null);
 
@@ -24,7 +26,7 @@ export default function DealerChat() {
     try {
       const userStr = await AsyncStorage.getItem('user');
       if (userStr) setUserId(JSON.parse(userStr).id);
-      const partners = await api('/chat/partners');
+      const partners = await api('/chat/partners', { cacheKey: 'dealer-chat-partners', cacheTtlMs: 10000 });
       if (partners.length > 0) {
         setAdminId(partners[0].id);
         setAdminName(partners[0].name || 'Admin');
@@ -36,21 +38,27 @@ export default function DealerChat() {
   const fetchMessages = useCallback(async () => {
     if (!adminId) return;
     try {
-      const data = await api(`/messages/${adminId}`);
+      const data = await api(`/messages/${adminId}`, { cacheKey: `dealer-messages-${adminId}`, cacheTtlMs: 5000 });
       setMessages(data);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
+      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: false }));
     } catch (e) { console.error(e); }
   }, [adminId]);
 
   useEffect(() => { init(); }, []);
 
   useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => setAppState(state));
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
     if (adminId) {
       fetchMessages();
-      intervalRef.current = setInterval(fetchMessages, 10000);
+      const pollInterval = appState === 'active' ? 4000 : 15000;
+      intervalRef.current = setInterval(fetchMessages, pollInterval);
       return () => clearInterval(intervalRef.current);
     }
-  }, [adminId]);
+  }, [adminId, appState, fetchMessages]);
 
   const sendMessage = async () => {
     if (!text.trim() || !adminId) return;
@@ -125,7 +133,7 @@ export default function DealerChat() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
   chatHeader: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 12,

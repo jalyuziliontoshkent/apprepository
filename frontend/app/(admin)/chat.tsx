@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, FlatList,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Send } from 'lucide-react-native';
@@ -17,12 +17,13 @@ export default function AdminChat() {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState('');
+  const [appState, setAppState] = useState(AppState.currentState);
   const scrollRef = useRef<ScrollView>(null);
   const intervalRef = useRef<any>(null);
 
   const fetchPartners = useCallback(async () => {
     try {
-      const data = await api('/chat/partners');
+      const data = await api('/chat/partners', { cacheKey: 'admin-chat-partners', cacheTtlMs: 10000 });
       setPartners(data);
       const userStr = await AsyncStorage.getItem('user');
       if (userStr) setUserId(JSON.parse(userStr).id);
@@ -32,21 +33,27 @@ export default function AdminChat() {
 
   const fetchMessages = useCallback(async (partnerId: string) => {
     try {
-      const data = await api(`/messages/${partnerId}`);
+      const data = await api(`/messages/${partnerId}`, { cacheKey: `admin-messages-${partnerId}`, cacheTtlMs: 5000 });
       setMessages(data);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
+      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: false }));
     } catch (e) { console.error(e); }
   }, []);
 
   useEffect(() => { fetchPartners(); }, []);
 
   useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => setAppState(state));
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
     if (selectedPartner) {
       fetchMessages(selectedPartner.id);
-      intervalRef.current = setInterval(() => fetchMessages(selectedPartner.id), 10000);
+      const pollInterval = appState === 'active' ? 4000 : 15000;
+      intervalRef.current = setInterval(() => fetchMessages(selectedPartner.id), pollInterval);
       return () => clearInterval(intervalRef.current);
     }
-  }, [selectedPartner]);
+  }, [selectedPartner, appState, fetchMessages]);
 
   const sendMessage = async () => {
     if (!text.trim() || !selectedPartner) return;

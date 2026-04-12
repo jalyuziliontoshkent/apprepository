@@ -3,7 +3,14 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { useAppStore } from '../src/utils/store';
+import { api as apiClient } from '../src/services/apiClient';
+import { initMonitoring } from '../src/services/monitoring';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { registerForPushNotifications } from '../src/services/notifications';
+
+export const api = apiClient;
 
 export type UserType = {
   id: string;
@@ -22,20 +29,6 @@ export type AuthState = {
   loading: boolean;
 };
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
-
-export const api = async (path: string, options: any = {}) => {
-  const token = await AsyncStorage.getItem('token');
-  const headers: any = { 'Content-Type': 'application/json', ...options.headers };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${BACKEND_URL}/api${path}`, { ...options, headers });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Xatolik yuz berdi' }));
-    throw new Error(typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail));
-  }
-  return res.json();
-};
-
 export default function RootLayout() {
   const [auth, setAuth] = useState<AuthState>({ user: null, token: null, loading: true });
   const segments = useSegments();
@@ -47,7 +40,7 @@ export default function RootLayout() {
       await useAppStore.getState().loadSettings();
       // Fetch exchange rate
       try {
-        const rateData = await api('/exchange-rate');
+        const rateData = await api('/exchange-rate', { cacheKey: 'exchange-rate', cacheTtlMs: 5 * 60 * 1000 });
         if (rateData?.rate) useAppStore.getState().setExchangeRate(rateData.rate);
       } catch {}
       const token = await AsyncStorage.getItem('token');
@@ -64,8 +57,18 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    initMonitoring();
     checkAuth();
+    registerForPushNotifications();
   }, []);
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const target = response.notification.request.content.data?.target as string | undefined;
+      if (target) router.push(target as any);
+    });
+    return () => sub.remove();
+  }, [router]);
 
   useEffect(() => {
     if (auth.loading) return;
@@ -93,10 +96,10 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <ErrorBoundary>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#050505' }, animation: 'fade' }} />
-    </>
+    </ErrorBoundary>
   );
 }
 

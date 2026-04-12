@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert,
 } from 'react-native';
@@ -7,10 +7,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { LogOut, Hash, CheckCircle, Ruler, Package } from 'lucide-react-native';
 import { api } from '../_layout';
-import { useTheme } from '../../src/utils/theme';
+import { useTheme, useCurrency } from '../../src/utils/theme';
 
 export default function WorkerTasks() {
   const c = useTheme();
+  const s = useMemo(() => createStyles(c), [c]);
   const { formatPrice } = useCurrency();
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,7 +22,7 @@ export default function WorkerTasks() {
 
   const fetchTasks = useCallback(async () => {
     try {
-      const data = await api('/worker/tasks');
+      const data = await api('/worker/tasks', { cacheKey: 'worker-tasks-active', cacheTtlMs: 15000 });
       setTasks(data.filter((t: any) => t.worker_status !== 'completed'));
       const u = await AsyncStorage.getItem('user');
       if (u) setUserName(JSON.parse(u).name || 'Ishchi');
@@ -50,10 +51,10 @@ export default function WorkerTasks() {
     router.replace('/');
   };
 
-  if (loading) return <SafeAreaView style={s.c}><ActivityIndicator size="large" color={c.accent} style={{ flex: 1 }} /></SafeAreaView>;
+  if (loading) return <SafeAreaView style={[s.c, { backgroundColor: c.bg }]}><ActivityIndicator size="large" color={c.accent} style={{ flex: 1 }} /></SafeAreaView>;
 
   return (
-    <SafeAreaView style={s.c}>
+    <SafeAreaView style={[s.c, { backgroundColor: c.bg }]}>
       <View style={s.header}>
         <View>
           <Text style={s.hi}>Salom</Text>
@@ -98,8 +99,8 @@ export default function WorkerTasks() {
   );
 }
 
-const s = StyleSheet.create({
-  c: { flex: 1, backgroundColor: c.bg },
+const createStyles = (c: any) => StyleSheet.create({
+  c: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 16 },
   hi: { fontSize: 13, color: c.textSec, fontWeight: '500' },
   name: { fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },

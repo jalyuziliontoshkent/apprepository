@@ -42,7 +42,7 @@ export default function AdminOrders() {
       const token = await AsyncStorage.getItem('token');
       const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
       if (Platform.OS === 'web') { const res = await fetch(`${BACKEND_URL}/api/reports/export-orders`, { headers: { 'Authorization': `Bearer ${token}` } }); const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'buyurtmalar.xlsx'; a.click(); URL.revokeObjectURL(url); }
-      else { const fileUri = FileSystem.documentDirectory + 'buyurtmalar.xlsx'; const res = await FileSystem.downloadAsync(`${BACKEND_URL}/api/reports/export-orders`, fileUri, { headers: { 'Authorization': `Bearer ${token}` } }); if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(res.uri); else Alert.alert('Tayyor', 'Fayl saqlandi: ' + res.uri); }
+      else { const fileUri = ((FileSystem as any).documentDirectory || '') + 'buyurtmalar.xlsx'; const res = await FileSystem.downloadAsync(`${BACKEND_URL}/api/reports/export-orders`, fileUri, { headers: { 'Authorization': `Bearer ${token}` } }); if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(res.uri); else Alert.alert('Tayyor', 'Fayl saqlandi: ' + res.uri); }
     } catch (e: any) { Alert.alert('Xatolik', e.message || 'Export xatosi'); } finally { setExporting(false); }
   };
 

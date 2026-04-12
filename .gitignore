@@ -77,33 +77,9 @@ agenthub/agents/youtube/db
 .cache/
 
 memory/test_credentials.md
-
 # Mobile development
-android-sdk/-e 
-# Environment files - only block local overrides, not main .env
+android-sdk/
+
+# Environment files
 *.env.local
 *.env.*.local
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*

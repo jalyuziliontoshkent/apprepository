@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator,
   Image, KeyboardAvoidingView, Platform, Alert,
@@ -15,6 +15,7 @@ type OrderItem = {
 
 export default function NewOrder() {
   const c = useTheme();
+  const s = useMemo(() => createStyles(c), [c]);
   const { formatPrice } = useCurrency();
   const [categories, setCategories] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
@@ -43,6 +44,7 @@ export default function NewOrder() {
 
   const addItem = (mat: any) => {
     if (sqm <= 0) return;
+    setSuccess(false);
     setItems([...items, { material_id: mat.id, material_name: mat.name, width, height, quantity: 1, price_per_sqm: mat.price_per_sqm }]);
     setWidth(''); setHeight('');
   };
@@ -64,7 +66,6 @@ export default function NewOrder() {
         }),
       });
       setItems([]); setNotes(''); setExpandedId(null); setSuccess(true);
-      setTimeout(() => setSuccess(false), 4000);
     } catch (e: any) { Alert.alert('Xatolik', e.message || 'Buyurtma yuborilmadi'); }
     finally { setSubmitting(false); }
   };
@@ -244,7 +245,7 @@ export default function NewOrder() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (c: any) => StyleSheet.create({
   c: { flex: 1, backgroundColor: c.bg },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
   title: { fontSize: 24, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },

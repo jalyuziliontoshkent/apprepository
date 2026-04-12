@@ -48,3 +48,19 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Supabase ulash
+
+1. `.env.example` dan nusxa olib `.env` fayl yarating.
+2. Quyidagi qiymatlarni to'ldiring:
+   - `EXPO_PUBLIC_SUPABASE_URL`
+   - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+3. Client tayyor holatda: `src/lib/supabase.ts`
+
+Foydalanish namunasi:
+
+```ts
+import { supabase } from '@/src/lib/supabase';
+
+const { data, error } = await supabase.from('your_table').select('*');
+```

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator,
 } from 'react-native';
@@ -8,10 +8,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { LogOut, Clock, Zap, Truck, CreditCard, Hash } from 'lucide-react-native';
 import { api } from '../_layout';
-import { colors, formatPrice, statusColors, statusLabels } from '../../src/utils/theme';
+import { useTheme, useCurrency, statusColors, statusLabels } from '../../src/utils/theme';
 
 export default function DealerDashboard() {
   const c = useTheme();
+  const s = useMemo(() => createStyles(c), [c]);
   const { formatPrice } = useCurrency();
   const [orders, setOrders] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
@@ -21,7 +22,10 @@ export default function DealerDashboard() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [ordersData, userData] = await Promise.all([api('/orders'), AsyncStorage.getItem('user')]);
+      const [ordersData, userData] = await Promise.all([
+        api('/orders', { cacheKey: 'dealer-orders', cacheTtlMs: 20000 }),
+        AsyncStorage.getItem('user'),
+      ]);
       setOrders(ordersData);
       if (userData) setUser(JSON.parse(userData));
     } catch (e) { console.error(e); }
@@ -35,14 +39,14 @@ export default function DealerDashboard() {
     router.replace('/');
   };
 
-  if (loading) return <SafeAreaView style={s.c}><ActivityIndicator size="large" color={c.accent} style={{ flex: 1 }} /></SafeAreaView>;
+  if (loading) return <SafeAreaView style={[s.c, { backgroundColor: c.bg }]}><ActivityIndicator size="large" color={c.accent} style={{ flex: 1 }} /></SafeAreaView>;
 
   const pending = orders.filter(o => o.status === 'kutilmoqda').length;
   const preparing = orders.filter(o => ['tayyorlanmoqda','tayyor'].includes(o.status)).length;
   const delivered = orders.filter(o => o.status === 'yetkazildi').length;
 
   return (
-    <SafeAreaView style={s.c}>
+    <SafeAreaView style={[s.c, { backgroundColor: c.bg }]}>
       <View style={s.header}>
         <View>
           <Text style={s.hi}>Xush kelibsiz</Text>
@@ -123,8 +127,8 @@ export default function DealerDashboard() {
   );
 }
 
-const s = StyleSheet.create({
-  c: { flex: 1, backgroundColor: c.bg },
+const createStyles = (c: any) => StyleSheet.create({
+  c: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 16 },
   hi: { fontSize: 13, color: c.textSec, fontWeight: '500' },
   name: { fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },

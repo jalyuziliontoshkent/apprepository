@@ -1,21 +1,25 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Package, Truck, Phone, Hash } from 'lucide-react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { api } from '../_layout';
-import { useTheme, useCurrency, statusLabels } from '../../src/utils/theme';
+import { useTheme, useCurrency, statusLabels, statusColors } from '../../src/utils/theme';
 
 export default function DealerOrders() {
   const c = useTheme();
+  const s = useMemo(() => createStyles(c), [c]);
   const { formatPrice } = useCurrency();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
 
   const fetchOrders = useCallback(async () => {
-    try { setOrders(await api('/orders')); }
+    try { setOrders(await api('/orders', { cacheKey: 'dealer-orders', cacheTtlMs: 20000 })); }
     catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
@@ -23,10 +27,45 @@ export default function DealerOrders() {
   useEffect(() => { fetchOrders(); }, []);
 
   const allStatuses = ['kutilmoqda','tasdiqlangan','tayyorlanmoqda','tayyor','yetkazilmoqda','yetkazildi'];
+  const filteredOrders = orders.filter((order) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      String(order.order_code || '').toLowerCase().includes(q) ||
+      String(statusLabels[order.status] || order.status || '').toLowerCase().includes(q)
+    );
+  });
+
+  const exportOrderPdf = async (order: any) => {
+    const items = (order.items || [])
+      .map((item: any) => `<li>${item.material_name} — ${item.width}m x ${item.height}m</li>`)
+      .join('');
+    const html = `
+      <html><body>
+      <h1>Lion Blinds — Order ${order.order_code}</h1>
+      <p>Status: ${statusLabels[order.status] || order.status}</p>
+      <p>Created: ${new Date(order.created_at).toLocaleString('uz-UZ')}</p>
+      <ul>${items}</ul>
+      <p>Total SQM: ${order.total_sqm}</p>
+      <p>Total Price: ${formatPrice(order.total_price)}</p>
+      </body></html>
+    `;
+    const file = await Print.printToFileAsync({ html });
+    if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(file.uri);
+  };
 
   return (
     <SafeAreaView style={s.container}>
       <Text style={s.title}>Buyurtmalarim</Text>
+      <View style={s.searchWrap}>
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Buyurtma qidirish..."
+          placeholderTextColor={c.textTer}
+          style={s.searchInput}
+        />
+      </View>
       {loading ? (
         <ActivityIndicator size="large" color={c.accent} style={{ flex: 1 }} />
       ) : (
@@ -35,12 +74,12 @@ export default function DealerOrders() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchOrders(); }} tintColor="#fff" />}
           contentContainerStyle={s.scrollContent}
         >
-          {orders.length === 0 ? (
+          {filteredOrders.length === 0 ? (
             <View style={s.emptyState}>
               <Package size={48} color="rgba(255,255,255,0.08)" />
               <Text style={s.emptyText}>Buyurtmalar yo'q</Text>
             </View>
-          ) : orders.map(order => (
+          ) : filteredOrders.map(order => (
             <View key={order.id} style={s.orderCard} testID={`my-order-${order.id}`}>
               <View style={s.orderHeader}>
                 <View style={s.codeSection}>
@@ -93,6 +132,9 @@ export default function DealerOrders() {
                 <Text style={s.orderTotal}>{order.total_sqm} kv.m</Text>
                 <Text style={s.orderPrice}>{formatPrice(order.total_price)}</Text>
               </View>
+              <TouchableOpacity style={s.pdfBtn} onPress={() => exportOrderPdf(order)}>
+                <Text style={s.pdfBtnText}>PDF eksport</Text>
+              </TouchableOpacity>
             </View>
           ))}
         </ScrollView>
@@ -101,9 +143,19 @@ export default function DealerOrders() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
   title: { fontSize: 26, fontWeight: '800', color: '#fff', paddingHorizontal: 24, paddingTop: 16, letterSpacing: -0.5 },
+  searchWrap: { paddingHorizontal: 24, paddingTop: 10 },
+  searchInput: {
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: c.card,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    color: c.text,
+    paddingHorizontal: 12,
+  },
   scrollContent: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 100 },
   emptyState: { alignItems: 'center', paddingTop: 80, gap: 12 },
   emptyText: { fontSize: 16, color: c.textTer },
@@ -133,4 +185,6 @@ const s = StyleSheet.create({
   orderFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
   orderTotal: { fontSize: 13, color: c.textSec },
   orderPrice: { fontSize: 18, fontWeight: '800', color: '#fff' },
+  pdfBtn: { marginTop: 10, alignSelf: 'flex-start', backgroundColor: c.accentSoft, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  pdfBtnText: { color: c.accent, fontWeight: '700', fontSize: 12 },
 });

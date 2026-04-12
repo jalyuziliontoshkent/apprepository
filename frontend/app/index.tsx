@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
@@ -14,6 +14,7 @@ const LOGO_URL = 'https://customer-assets.emergentagent.com/job_dealer-dashboard
 
 export default function Login() {
   const c = useTheme();
+  const s = useMemo(() => createStyles(c), [c]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,13 +39,16 @@ export default function Login() {
   };
 
   return (
-    <View style={s.root}>
+    <View style={[s.root, { backgroundColor: c.bg }]}>
       <SafeAreaView style={s.safe}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'center' }}>
           <View style={s.content}>
             <Image source={{ uri: LOGO_URL }} style={s.logo} resizeMode="contain" />
             <View style={s.form}>
+              <Text style={s.title}>Xush kelibsiz</Text>
+              <Text style={s.subtitle}>Davom etish uchun ma'lumotlaringizni kiriting</Text>
               {error ? <Text style={s.error}>{error}</Text> : null}
+              <Text style={s.label}>Email</Text>
               <TextInput
                 testID="login-email-input"
                 style={s.input}
@@ -54,7 +58,10 @@ export default function Login() {
                 placeholderTextColor="rgba(255,255,255,0.25)"
                 autoCapitalize="none"
                 keyboardType="email-address"
+                accessibilityLabel="Email kiriting"
+                returnKeyType="next"
               />
+              <Text style={s.label}>Parol</Text>
               <TextInput
                 testID="login-password-input"
                 style={s.input}
@@ -63,8 +70,18 @@ export default function Login() {
                 placeholder="Parol"
                 placeholderTextColor="rgba(255,255,255,0.25)"
                 secureTextEntry
+                accessibilityLabel="Parol kiriting"
+                returnKeyType="done"
               />
-              <TouchableOpacity testID="login-submit-button" style={s.btn} onPress={handleLogin} disabled={loading} activeOpacity={0.8}>
+              <TouchableOpacity
+                testID="login-submit-button"
+                style={s.btn}
+                onPress={handleLogin}
+                disabled={loading}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Kirish tugmasi"
+              >
                 <LinearGradient colors={['#6C63FF', '#5A52E0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btnGrad}>
                   {loading ? <ActivityIndicator color="#fff" /> : (
                     <><Text style={s.btnText}>Kirish</Text><ArrowRight size={18} color="#fff" /></>
@@ -79,15 +96,18 @@ export default function Login() {
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: c.bg },
+const createStyles = (c: any) => StyleSheet.create({
+  root: { flex: 1 },
   safe: { flex: 1 },
   content: { alignItems: 'center', paddingHorizontal: 32 },
   logo: { width: 200, height: 100, marginBottom: 48 },
   form: { width: '100%', gap: 12 },
+  title: { fontSize: 28, fontWeight: '800', color: '#fff', textAlign: 'center' },
+  subtitle: { fontSize: 15, color: c.textSec, textAlign: 'center', marginBottom: 8, lineHeight: 22 },
+  label: { fontSize: 15, color: '#fff', fontWeight: '600', marginBottom: -4 },
   error: { color: c.danger, fontSize: 13, textAlign: 'center', marginBottom: 4 },
-  input: { height: 56, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 20, fontSize: 16, color: '#fff' },
+  input: { minHeight: 58, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 20, fontSize: 18, color: '#fff' },
   btn: { borderRadius: 18, overflow: 'hidden', marginTop: 8 },
-  btnGrad: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  btnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  btnGrad: { minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  btnText: { fontSize: 18, fontWeight: '800', color: '#fff' },
 });

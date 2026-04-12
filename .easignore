@@ -1,0 +1,14 @@
+.git
+.emergent
+backend
+memory
+tests
+test_reports
+*.md
+backend_test.py
+design_guidelines.json
+frontend/.metro-cache
+frontend/node_modules
+frontend/.expo
+frontend/dist
+frontend/web-build

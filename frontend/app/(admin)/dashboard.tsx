@@ -14,6 +14,7 @@ import {
 import { api } from '../_layout';
 import { useTheme, useCurrency } from '../../src/utils/theme';
 import { useAppStore } from '../../src/utils/store';
+import { getApiMetrics } from '../../src/services/telemetry';
 
 export default function AdminDashboard() {
   const c = useTheme();
@@ -38,7 +39,10 @@ export default function AdminDashboard() {
   const fetchData = useCallback(async () => {
     try {
       const [statsData, reportsData, lowStockData, userStr] = await Promise.all([
-        api('/statistics'), api('/reports'), api('/alerts/low-stock'), AsyncStorage.getItem('user'),
+        api('/statistics', { cacheKey: 'admin-statistics', cacheTtlMs: 30000 }),
+        api('/reports', { cacheKey: 'admin-reports', cacheTtlMs: 30000 }),
+        api('/alerts/low-stock', { cacheKey: 'admin-low-stock', cacheTtlMs: 15000 }),
+        AsyncStorage.getItem('user'),
       ]);
       setStats(statsData); setReports(reportsData); setLowStock(lowStockData || []);
       if (userStr) { const u = JSON.parse(userStr); setUserName(u.name || 'Admin'); setUserEmail(u.email || ''); }
@@ -69,6 +73,7 @@ export default function AdminDashboard() {
 
   const maxRevenue = reports?.daily ? Math.max(...reports.daily.map((d: any) => d.revenue), 1) : 1;
   const topMatMax = reports?.top_materials?.[0]?.total_price || 1;
+  const metrics = getApiMetrics();
 
   return (
     <SafeAreaView style={[s.c, { backgroundColor: c.bg }]}>
@@ -101,6 +106,14 @@ export default function AdminDashboard() {
       )}
 
       <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} tintColor={c.text} />} contentContainerStyle={s.scroll}>
+        <View style={[s.telemetryCard, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
+          <Text style={[s.telemetryTitle, { color: c.textSec }]}>Runtime metrics</Text>
+          <View style={s.telemetryRow}>
+            <Text style={[s.telemetryText, { color: c.textTer }]}>Requests: {metrics.requests}</Text>
+            <Text style={[s.telemetryText, { color: c.textTer }]}>Fail: {metrics.failures}</Text>
+            <Text style={[s.telemetryText, { color: c.textTer }]}>Avg: {metrics.avgLatencyMs}ms</Text>
+          </View>
+        </View>
 
         {/* Low Stock Alert */}
         {lowStock.length > 0 && (
@@ -294,6 +307,10 @@ const s = StyleSheet.create({
   hBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   rateBar: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 16, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, marginBottom: 4 },
   scroll: { paddingHorizontal: 16, paddingTop: 8 },
+  telemetryCard: { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 12 },
+  telemetryTitle: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6, fontWeight: '700' },
+  telemetryRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  telemetryText: { fontSize: 12, fontWeight: '600' },
   alert: { borderRadius: 16, padding: 14, marginBottom: 14, borderWidth: 1 },
   alertH: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   alertTitle: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
