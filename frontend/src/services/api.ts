@@ -16,15 +16,10 @@ type RequestOptions = RequestInit & {
   cacheTtlMs?: number;
 };
 
-let tokenCache: { value: string | null; expiresAt: number } = { value: null, expiresAt: 0 };
 const pendingGetRequests = new Map<string, Promise<any>>();
 
 const getAuthToken = async () => {
-  const now = Date.now();
-  if (now < tokenCache.expiresAt) return tokenCache.value;
-  const token = await AsyncStorage.getItem('token');
-  tokenCache = { value: token, expiresAt: now + TOKEN_CACHE_TTL_MS };
-  return token;
+  return await AsyncStorage.getItem('token');
 };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -68,7 +63,10 @@ const executeRequest = async (baseUrl: string, path: string, options: RequestOpt
 
       if (!res.ok) throw await parseError(res);
       trackApiSuccess(Date.now() - startedAt);
-      return await res.json();
+      const data = await res.json();
+      // Auto-update token logic not needed when reading directly from AsyncStorage
+      
+      return data;
     } catch (error: any) {
       const normalized =
         error?.name === 'AbortError'
@@ -78,7 +76,6 @@ const executeRequest = async (baseUrl: string, path: string, options: RequestOpt
           : new ApiError('Tarmoq xatosi', 'NETWORK');
 
       if (normalized.code === 'UNAUTHORIZED') {
-        tokenCache = { value: null, expiresAt: 0 };
         await AsyncStorage.multiRemove(['token', 'user']).catch(() => undefined);
         if (typeof window !== 'undefined' && window.location.pathname !== '/') {
           window.location.replace('/');

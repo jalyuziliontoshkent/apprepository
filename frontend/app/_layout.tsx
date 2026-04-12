@@ -84,7 +84,7 @@ export default function RootLayout() {
         router.replace('/(worker)/tasks');
       }
     }
-  }, [auth.user, auth.loading]);
+  }, [auth.user, auth.loading, segments]);
 
   if (auth.loading) {
     return (
