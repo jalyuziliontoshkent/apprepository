@@ -4,16 +4,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import {
   LogOut, TrendingUp, Clock, CheckCircle, Truck, XCircle, Zap, Users, Boxes, Wrench,
-  Settings, X, AlertTriangle, Medal, Calendar, DollarSign, ShoppingCart, ArrowUpRight,
-  BarChart3, Package, ChevronRight, Award, Activity, Moon, Sun, RefreshCw,
+  Settings, X, AlertTriangle, Calendar, DollarSign, ShoppingCart,
+  BarChart3, Package, Award, Activity, Moon, Sun, RefreshCw,
 } from 'lucide-react-native';
-import { api } from '../_layout';
+import { api } from '../../src/services/apiClient';
 import { useTheme, useCurrency } from '../../src/utils/theme';
 import { useAppStore } from '../../src/utils/store';
+import { useAuthStore } from '../../src/store/useAuthStore';
 import { getApiMetrics } from '../../src/services/telemetry';
 
 export default function AdminDashboard() {
@@ -22,13 +22,14 @@ export default function AdminDashboard() {
   const toggleTheme = useAppStore((s) => s.toggleTheme);
   const theme = useAppStore((s) => s.theme);
 
+  const authUser  = useAuthStore((s) => s.user);
+  const authLogout = useAuthStore((s) => s.logout);
+
   const [stats, setStats] = useState<any>(null);
   const [reports, setReports] = useState<any>(null);
   const [lowStock, setLowStock] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [userName, setUserName] = useState('');
-  const [userEmail, setUserEmail] = useState('');
   const [showProfile, setShowProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ email: '', current_password: '', password: '' });
   const [profileLoading, setProfileLoading] = useState(false);
@@ -36,31 +37,34 @@ export default function AdminDashboard() {
   const [profileErr, setProfileErr] = useState('');
   const router = useRouter();
 
+  const userName  = authUser?.name  || 'Admin';
+  const userEmail = authUser?.email || '';
+
   const fetchData = useCallback(async () => {
     try {
-      const [statsData, reportsData, lowStockData, userStr] = await Promise.all([
-        api('/statistics', { cacheKey: 'admin-statistics', cacheTtlMs: 30000 }),
-        api('/reports', { cacheKey: 'admin-reports', cacheTtlMs: 30000 }),
-        api('/alerts/low-stock', { cacheKey: 'admin-low-stock', cacheTtlMs: 15000 }),
-        AsyncStorage.getItem('user'),
+      const [statsData, reportsData, lowStockData] = await Promise.all([
+        api('/statistics',      { cacheKey: 'admin-statistics', cacheTtlMs: 30000 }),
+        api('/reports',         { cacheKey: 'admin-reports',    cacheTtlMs: 30000 }),
+        api('/alerts/low-stock',{ cacheKey: 'admin-low-stock',  cacheTtlMs: 15000 }),
       ]);
       setStats(statsData); setReports(reportsData); setLowStock(lowStockData || []);
-      if (userStr) { const u = JSON.parse(userStr); setUserName(u.name || 'Admin'); setUserEmail(u.email || ''); }
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleLogout = async () => { await AsyncStorage.multiRemove(['token', 'user']); router.replace('/'); };
+  const handleLogout = async () => {
+    await authLogout();
+    router.replace('/');
+  };
   const openProfile = () => { setProfileForm({ email: userEmail, current_password: '', password: '' }); setProfileMsg(''); setProfileErr(''); setShowProfile(true); };
   const saveProfile = async () => {
     if (!profileForm.current_password) { setProfileErr('Joriy parolni kiriting'); return; }
     setProfileLoading(true); setProfileErr(''); setProfileMsg('');
     try {
       const res = await api('/auth/profile', { method: 'PUT', body: JSON.stringify(profileForm) });
-      await AsyncStorage.setItem('token', res.token); await AsyncStorage.setItem('user', JSON.stringify(res.user));
-      setUserName(res.user.name || 'Admin'); setUserEmail(res.user.email || '');
+      await useAuthStore.getState().setUser(res.user, res.token);
       setProfileMsg('Profil yangilandi!'); setProfileForm({ ...profileForm, current_password: '', password: '' });
     } catch (e: any) { setProfileErr(e.message || 'Xatolik'); }
     finally { setProfileLoading(false); }

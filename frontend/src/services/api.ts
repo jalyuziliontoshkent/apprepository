@@ -2,27 +2,30 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCache, getStaleCache, setCache } from './cache';
 import { ApiError, mapHttpError } from './errors';
 import { trackApiFailure, trackApiSuccess } from './telemetry';
+import { useAuthStore } from '../store/useAuthStore';
 
-/** Render uyg‘onguncha 30–60s kutishi mumkin — qisqa timeout telefonda "tarmoq xatosi". */
-const API_TIMEOUT_MS = 55_000;
+const API_TIMEOUT_MS  = 55_000;
 const DEFAULT_RETRIES = 2;
-const RETRY_DELAY_MS = 800;
+const RETRY_BASE_MS   = 800;
 
 type RequestOptions = RequestInit & {
-  timeoutMs?: number;
-  retries?: number;
-  dedup?: boolean;
-  cacheKey?: string;
+  timeoutMs?:  number;
+  retries?:    number;
+  dedup?:      boolean;
+  cacheKey?:   string;
   cacheTtlMs?: number;
 };
 
 const pendingGetRequests = new Map<string, Promise<any>>();
 
-const getAuthToken = async () => {
-  return await AsyncStorage.getItem('token');
+const getAuthToken = async (): Promise<string | null> => {
+  // Prefer zustand in-memory token (fastest path), fallback to AsyncStorage
+  const storeToken = useAuthStore.getState().token;
+  if (storeToken) return storeToken;
+  return AsyncStorage.getItem('token');
 };
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const shouldRetry = (
   error: unknown,
@@ -30,7 +33,7 @@ const shouldRetry = (
   attempt: number,
   retries: number,
   path: string,
-) => {
+): boolean => {
   if (attempt >= retries) return false;
   if (!(error instanceof ApiError)) return false;
   const retryable = error.code === 'TIMEOUT' || error.code === 'NETWORK' || error.code === 'SERVER';
@@ -40,32 +43,40 @@ const shouldRetry = (
   return false;
 };
 
-const parseError = async (res: Response) => {
+const parseError = async (res: Response): Promise<ApiError> => {
   const fallback = 'Xatolik yuz berdi';
-  let err: { detail?: string } = { detail: fallback };
+  let detail: string = fallback;
   try {
     const text = await res.text();
-    if (text) err = JSON.parse(text);
-  } catch {
-    /* HTML yoki bo‘sh javob (masalan Render 502) */
-  }
-  const message = typeof err?.detail === 'string' ? err.detail : fallback;
-  return mapHttpError(res.status, message, err);
+    if (text) {
+      const parsed = JSON.parse(text);
+      if (typeof parsed?.detail === 'string') detail = parsed.detail;
+      else if (typeof parsed?.message === 'string') detail = parsed.message;
+    }
+  } catch { /* ignore parse errors */ }
+  return mapHttpError(res.status, detail);
 };
 
-const executeRequest = async (baseUrl: string, path: string, options: RequestOptions = {}) => {
-  const method = (options.method || 'GET').toUpperCase();
+const executeRequest = async (
+  baseUrl: string,
+  path: string,
+  options: RequestOptions = {},
+): Promise<unknown> => {
+  const method  = (options.method || 'GET').toUpperCase();
   const retries = options.retries ?? DEFAULT_RETRIES;
 
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const startedAt = Date.now();
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const startedAt  = Date.now();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? API_TIMEOUT_MS);
+    const timer      = setTimeout(() => controller.abort(), options.timeoutMs ?? API_TIMEOUT_MS);
 
     try {
       const token = await getAuthToken();
-      const headers: any = { 'Content-Type': 'application/json', ...options.headers };
-      if (token) headers.Authorization = `Bearer ${token}`;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(options.headers as Record<string, string>),
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const res = await fetch(`${baseUrl}/api${path}`, {
         ...options,
@@ -75,69 +86,66 @@ const executeRequest = async (baseUrl: string, path: string, options: RequestOpt
       });
 
       if (!res.ok) throw await parseError(res);
+
       trackApiSuccess(Date.now() - startedAt);
       const text = await res.text();
-      let data: unknown;
-      try {
-        data = text ? JSON.parse(text) : null;
-      } catch {
-        throw new ApiError('Server javobi noto‘g‘ri formatda', 'SERVER', res.status);
-      }
-      return data;
-    } catch (error: any) {
-      const normalized =
-        error?.name === 'AbortError'
+      return text ? JSON.parse(text) : null;
+
+    } catch (raw: any) {
+      const normalized: ApiError =
+        raw?.name === 'AbortError'
           ? new ApiError(
-              "Server javob bermadi (juda uzoq kutildi). Internetni tekshiring yoki birozdan keyin qayta urinib ko'ring.",
+              "Server javob bermadi. Internetingizni tekshiring yoki birozdan keyin qayta urinib ko'ring.",
               'TIMEOUT',
             )
-          : error instanceof ApiError
-          ? error
+          : raw instanceof ApiError
+          ? raw
           : new ApiError(
-              error?.message && typeof error.message === 'string' && error.message !== 'Network request failed'
-                ? error.message
-                : "Serverga ulanib bo'lmadi. Internet yoki server holatini tekshiring.",
+              raw?.message || "Serverga ulanib bo'lmadi.",
               'NETWORK',
             );
 
+      // Handle 401 — clear session and let AuthGuard redirect
       if (normalized.code === 'UNAUTHORIZED') {
-        await AsyncStorage.multiRemove(['token', 'user']).catch(() => undefined);
-        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-          window.location.replace('/');
-        }
+        await useAuthStore.getState().logout().catch(() => {});
       }
 
       trackApiFailure(Date.now() - startedAt);
+
       if (shouldRetry(normalized, method, attempt, retries, path)) {
-        await sleep(RETRY_DELAY_MS * Math.pow(2, attempt));
+        await sleep(RETRY_BASE_MS * Math.pow(2, attempt));
         continue;
       }
       throw normalized;
     } finally {
-      clearTimeout(timeout);
+      clearTimeout(timer);
     }
   }
+
+  // Unreachable, but satisfies TypeScript
+  throw new ApiError('Max retries exceeded', 'NETWORK');
 };
 
 export const createApi = (baseUrl?: string) => {
-  const resolvedBaseUrl =
-    baseUrl?.trim() ||
-    (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '');
+  const resolvedBaseUrl = (baseUrl?.trim() || '');
 
   return async <T = any>(path: string, options: RequestOptions = {}): Promise<T> => {
     if (!resolvedBaseUrl) {
-      throw new ApiError("EXPO_PUBLIC_BACKEND_URL sozlanmagan", 'NETWORK');
+      throw new ApiError('Backend URL sozlanmagan (EXPO_PUBLIC_BACKEND_URL)', 'NETWORK');
     }
-    const method = (options.method || 'GET').toUpperCase();
-    const isGet = method === 'GET';
-    const cacheKey = options.cacheKey;
+
+    const method     = (options.method || 'GET').toUpperCase();
+    const isGet      = method === 'GET';
+    const cacheKey   = options.cacheKey;
     const cacheTtlMs = options.cacheTtlMs ?? 0;
 
+    // 1. Fresh cache hit
     if (isGet && cacheKey) {
       const cached = await getCache<T>(cacheKey);
-      if (cached) return cached;
+      if (cached !== null) return cached;
     }
 
+    // 2. Request deduplication
     const dedupKey = isGet && options.dedup !== false ? `${method}:${path}` : '';
     if (dedupKey && pendingGetRequests.has(dedupKey)) {
       return pendingGetRequests.get(dedupKey) as Promise<T>;
@@ -151,17 +159,16 @@ export const createApi = (baseUrl?: string) => {
     });
 
     if (dedupKey) pendingGetRequests.set(dedupKey, reqPromise);
+
     try {
       return await reqPromise;
     } catch (e) {
-      if (
-        isGet &&
-        cacheKey &&
-        e instanceof ApiError &&
-        (e.code === 'NETWORK' || e.code === 'TIMEOUT' || e.code === 'SERVER')
-      ) {
-        const stale = await getStaleCache<T>(cacheKey);
-        if (stale !== null) return stale;
+      // 3. Stale cache fallback on network/server errors
+      if (isGet && cacheKey && e instanceof ApiError) {
+        if (e.code === 'NETWORK' || e.code === 'TIMEOUT' || e.code === 'SERVER') {
+          const stale = await getStaleCache<T>(cacheKey);
+          if (stale !== null) return stale;
+        }
       }
       throw e;
     } finally {

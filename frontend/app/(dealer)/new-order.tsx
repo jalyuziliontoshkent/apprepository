@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus, Send, X, Check, Trash2, ChevronLeft, StickyNote, Package, FolderOpen } from 'lucide-react-native';
-import { api } from '../_layout';
+import { api } from '../../src/services/apiClient';
 import { useTheme, useCurrency } from '../../src/utils/theme';
 
 type OrderItem = {

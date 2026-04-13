@@ -6,15 +6,16 @@ const supabaseUrl =
   process.env.EXPO_PUBLIC_SUPABASE_URL ??
   process.env.NEXT_PUBLIC_SUPABASE_URL ??
   process.env.REACT_APP_SUPABASE_URL;
+
 const supabaseAnonKey =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??
   process.env.REACT_APP_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
-    'Supabase env topilmadi. EXPO_PUBLIC_*, NEXT_PUBLIC_* yoki REACT_APP_* qiymatlarini sozlang.'
+    'Supabase env topilmadi. EXPO_PUBLIC_SUPABASE_URL va EXPO_PUBLIC_SUPABASE_ANON_KEY ni .env ga qo\'shing.'
   );
 }
 

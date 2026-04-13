@@ -5,9 +5,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Send } from 'lucide-react-native';
-import { api } from '../_layout';
+import { api } from '../../src/services/apiClient';
 import { useTheme } from '../../src/utils/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuthStore } from '../../src/store/useAuthStore';
 
 export default function DealerChat() {
   const c = useTheme();
@@ -15,7 +15,7 @@ export default function DealerChat() {
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState('');
+  const userId = useAuthStore((s) => s.user?.id) ?? '';
   const [adminId, setAdminId] = useState('');
   const [adminName, setAdminName] = useState('Admin');
   const [appState, setAppState] = useState(AppState.currentState);
@@ -24,8 +24,6 @@ export default function DealerChat() {
 
   const init = useCallback(async () => {
     try {
-      const userStr = await AsyncStorage.getItem('user');
-      if (userStr) setUserId(JSON.parse(userStr).id);
       const partners = await api('/chat/partners', { cacheKey: 'dealer-chat-partners', cacheTtlMs: 10000 });
       if (partners.length > 0) {
         setAdminId(partners[0].id);

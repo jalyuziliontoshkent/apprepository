@@ -19,9 +19,11 @@ from pydantic import BaseModel
 from typing import List, Optional
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from modules.common.indexes import create_indexes
+from modules.common.logging import configure_logging
+from modules.common.middleware import install_middleware
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = configure_logging()
 
 
 def load_database_url() -> str:
@@ -100,6 +102,7 @@ app = FastAPI()
 app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 api_router = APIRouter(prefix="/api")
 JWT_ALGORITHM = "HS256"
+install_middleware(app, logger)
 
 # ─── IN-MEMORY CACHE (DB tezlashtirish) ───
 import time as _time
@@ -938,6 +941,16 @@ async def create_tables(db):
             created_at TEXT DEFAULT ''
         )
     """)
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS user_settings (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            theme TEXT NOT NULL DEFAULT 'system',
+            notifications BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TEXT DEFAULT '',
+            updated_at TEXT DEFAULT ''
+        )
+    """)
 
 async def seed_admin(db):
     email = os.environ.get("ADMIN_EMAIL", "admin@curtain.uz")
@@ -1190,6 +1203,42 @@ async def health_check():
     except Exception as e:
         return {"status": "error", "database": str(e)}
 
+@api_router.get("/settings/me")
+async def get_settings(user: dict = Depends(get_current_user)):
+    db = await get_pool()
+    row = await db.fetchrow(
+        "SELECT theme, notifications, created_at, updated_at FROM user_settings WHERE user_id = $1",
+        int(user["id"]),
+    )
+    if not row:
+        return {"theme": "system", "notifications": True}
+    return dict(row)
+
+@api_router.put("/settings/me")
+async def update_settings(request: Request, user: dict = Depends(get_current_user)):
+    payload = await request.json()
+    theme = str(payload.get("theme", "system")).strip().lower()
+    notifications = bool(payload.get("notifications", True))
+    if theme not in {"system", "light", "dark"}:
+        raise HTTPException(400, "Invalid theme")
+
+    db = await get_pool()
+    now = datetime.now(timezone.utc).isoformat()
+    row = await db.fetchrow(
+        """
+        INSERT INTO user_settings (user_id, theme, notifications, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $4)
+        ON CONFLICT (user_id)
+        DO UPDATE SET theme = EXCLUDED.theme, notifications = EXCLUDED.notifications, updated_at = EXCLUDED.updated_at
+        RETURNING theme, notifications, created_at, updated_at
+        """,
+        int(user["id"]),
+        theme,
+        notifications,
+        now,
+    )
+    return dict(row)
+
 # ─── KEEP ALIVE - PostgreSQL uxlab qolmasligi uchun ───
 async def keep_alive_task():
     """Har 5 daqiqada PostgreSQL'ga ping yuborib, uxlab qolmasligini ta'minlaydi"""
@@ -1210,6 +1259,7 @@ async def startup():
     pool = await asyncpg.create_pool(DATABASE_URL, **asyncpg_pool_kwargs())
     async with pool.acquire() as conn:
         await create_tables(conn)
+        await create_indexes(conn)
         await seed_admin(conn)
     asyncio.create_task(keep_alive_task())
     logger.info("Muvaffaqiyat: API tayyor, PostgreSQL ulandi, keep-alive yoqildi (bu xato emas).")

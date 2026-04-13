@@ -1,56 +1,92 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { AlertTriangle, RefreshCw } from 'lucide-react-native';
 import { captureException } from '../services/monitoring';
+import { darkColors } from '../theme/theme';
 
-type Props = {
-  children: React.ReactNode;
-};
-
-type State = {
-  hasError: boolean;
-};
+type Props = { children: React.ReactNode };
+type State = { hasError: boolean; error: Error | null };
 
 export class ErrorBoundary extends React.Component<Props, State> {
-  state: State = { hasError: false };
+  state: State = { hasError: false, error: null };
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: Error) {
     captureException(error, { source: 'ErrorBoundary' });
   }
 
-  handleRetry = () => {
-    this.setState({ hasError: false });
-  };
+  handleRetry = () => this.setState({ hasError: false, error: null });
 
   render() {
-    if (this.state.hasError) {
-      return (
-        <View style={styles.container}>
-          <Text style={styles.title}>Ilovada xatolik yuz berdi</Text>
-          <Text style={styles.subtitle}>Qayta urinib ko‘ring.</Text>
-          <TouchableOpacity onPress={this.handleRetry} style={styles.button}>
-            <Text style={styles.buttonText}>Qayta ochish</Text>
-          </TouchableOpacity>
+    if (!this.state.hasError) return this.props.children;
+
+    const c = darkColors;
+    return (
+      <View style={[s.root, { backgroundColor: c.bg }]}>
+        <View style={[s.iconWrap, { backgroundColor: c.dangerSoft }]}>
+          <AlertTriangle size={32} color={c.danger} />
         </View>
-      );
-    }
-    return this.props.children;
+        <Text style={[s.title, { color: c.text }]}>Ilovada xatolik yuz berdi</Text>
+        <Text style={[s.subtitle, { color: c.textSec }]}>
+          Qayta urinib ko'ring. Muammo davom etsa, ilovani qayta ishga tushiring.
+        </Text>
+        <TouchableOpacity
+          style={[s.btn, { backgroundColor: c.primary }]}
+          onPress={this.handleRetry}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Qayta ochish"
+        >
+          <RefreshCw size={18} color="#fff" style={{ marginRight: 8 }} />
+          <Text style={s.btnText}>Qayta ochish</Text>
+        </TouchableOpacity>
+        {__DEV__ && this.state.error && (
+          <Text style={[s.debug, { color: c.danger }]} selectable>
+            {this.state.error.message}
+          </Text>
+        )}
+      </View>
+    );
   }
 }
 
-const styles = StyleSheet.create({
-  container: {
+const s = StyleSheet.create({
+  root: {
     flex: 1,
-    backgroundColor: '#050505',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 32,
   },
-  title: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 8 },
-  subtitle: { color: 'rgba(255,255,255,0.65)', fontSize: 14, marginBottom: 18 },
-  button: { backgroundColor: '#6C63FF', paddingHorizontal: 18, paddingVertical: 12, borderRadius: 10 },
-  buttonText: { color: '#fff', fontWeight: '700' },
+  iconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 23,
+    marginBottom: 28,
+  },
+  btn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 30,
+  },
+  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  debug: { fontSize: 11, marginTop: 20, textAlign: 'center', fontFamily: 'monospace' },
 });

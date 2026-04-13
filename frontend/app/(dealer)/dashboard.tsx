@@ -4,30 +4,27 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { LogOut, Clock, Zap, Truck, CreditCard, Hash } from 'lucide-react-native';
-import { api } from '../_layout';
-import { useTheme, useCurrency, statusColors, statusLabels } from '../../src/utils/theme';
+import { api } from '../../src/services/apiClient';
+import { useTheme, useCurrency, getStatusColor, statusLabels } from '../../src/utils/theme';
+import { useAuthStore } from '../../src/store/useAuthStore';
 
 export default function DealerDashboard() {
   const c = useTheme();
+  const authUser  = useAuthStore((s) => s.user);
+  const authLogout = useAuthStore((s) => s.logout);
   const s = useMemo(() => createStyles(c), [c]);
   const { formatPrice } = useCurrency();
   const [orders, setOrders] = useState<any[]>([]);
-  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
 
   const fetchData = useCallback(async () => {
     try {
-      const [ordersData, userData] = await Promise.all([
-        api('/orders', { cacheKey: 'dealer-orders', cacheTtlMs: 20000 }),
-        AsyncStorage.getItem('user'),
-      ]);
+      const ordersData = await api('/orders', { cacheKey: 'dealer-orders', cacheTtlMs: 20000 });
       setOrders(ordersData);
-      if (userData) setUser(JSON.parse(userData));
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
@@ -35,7 +32,7 @@ export default function DealerDashboard() {
   useEffect(() => { fetchData(); }, []);
 
   const handleLogout = async () => {
-    await AsyncStorage.multiRemove(['token', 'user']);
+    await authLogout();
     router.replace('/');
   };
 
@@ -50,7 +47,7 @@ export default function DealerDashboard() {
       <View style={s.header}>
         <View>
           <Text style={s.hi}>Xush kelibsiz</Text>
-          <Text style={s.name}>{user?.name || 'Diler'}</Text>
+          <Text style={s.name}>{authUser?.name || 'Diler'}</Text>
         </View>
         <TouchableOpacity testID="dealer-logout-btn" onPress={handleLogout} style={s.logoutBtn}>
           <LogOut size={20} color="rgba(255,255,255,0.4)" />
@@ -67,12 +64,12 @@ export default function DealerDashboard() {
             <View style={s.creditRow}>
               <View style={s.creditItem}>
                 <Text style={s.creditLabel}>Kredit limit</Text>
-                <Text style={s.creditVal}>{formatPrice(user?.credit_limit || 0)}</Text>
+                <Text style={s.creditVal}>{formatPrice(authUser?.credit_limit || 0)}</Text>
               </View>
               <View style={s.creditDiv} />
               <View style={s.creditItem}>
                 <Text style={s.creditLabel}>Qarz</Text>
-                <Text style={[s.creditVal, (user?.debt || 0) > 0 && { color: c.danger }]}>{formatPrice(user?.debt || 0)}</Text>
+                <Text style={[s.creditVal, (authUser?.debt || 0) > 0 && { color: c.danger }]}>{formatPrice(authUser?.debt || 0)}</Text>
               </View>
             </View>
           </LinearGradient>
@@ -101,9 +98,9 @@ export default function DealerDashboard() {
               <View key={order.id} style={s.orderCard} testID={`dealer-order-${order.id}`}>
                 <View style={s.orderHead}>
                   <View style={s.codeBadge}><Hash size={11} color={c.accent} /><Text style={s.codeText}>{order.order_code}</Text></View>
-                  <View style={[s.sBadge, { backgroundColor: (statusColors[order.status] || '#fff') + '18' }]}>
-                    <View style={[s.sDot, { backgroundColor: statusColors[order.status] }]} />
-                    <Text style={[s.sText, { color: statusColors[order.status] }]}>{statusLabels[order.status]}</Text>
+                    <View style={[s.sBadge, { backgroundColor: getStatusColor(order.status, c) + '18' }]}>
+                      <View style={[s.sDot, { backgroundColor: getStatusColor(order.status, c) }]} />
+                      <Text style={[s.sText, { color: getStatusColor(order.status, c) }]}>{statusLabels[order.status]}</Text>
                   </View>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.itemsPreview}>

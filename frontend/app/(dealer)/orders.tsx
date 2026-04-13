@@ -6,8 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Package, Truck, Phone, Hash } from 'lucide-react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { api } from '../_layout';
-import { useTheme, useCurrency, statusLabels, statusColors } from '../../src/utils/theme';
+import { api } from '../../src/services/apiClient';
+import { useTheme, useCurrency, statusLabels, getStatusColor } from '../../src/utils/theme';
 
 export default function DealerOrders() {
   const c = useTheme();
@@ -86,9 +86,9 @@ export default function DealerOrders() {
                   <Hash size={13} color={c.accent} />
                   <Text style={s.codeText}>{order.order_code}</Text>
                 </View>
-                <View style={[s.statusBadge, { backgroundColor: (statusColors[order.status] || '#fff') + '18' }]}>
-                  <View style={[s.statusDot, { backgroundColor: statusColors[order.status] }]} />
-                  <Text style={[s.statusText, { color: statusColors[order.status] }]}>{statusLabels[order.status] || order.status}</Text>
+                <View style={[s.statusBadge, { backgroundColor: getStatusColor(order.status, c) + '18' }]}>
+                  <View style={[s.statusDot, { backgroundColor: getStatusColor(order.status, c) }]} />
+                  <Text style={[s.statusText, { color: getStatusColor(order.status, c) }]}>{statusLabels[order.status] || order.status}</Text>
                 </View>
               </View>
               <Text style={s.orderDate}>{new Date(order.created_at).toLocaleString('uz-UZ')}</Text>
