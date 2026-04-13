@@ -7,7 +7,6 @@ import {
   Platform,
   Animated,
   ActivityIndicator,
-  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -43,7 +42,7 @@ export default function LoginScreen() {
       duration: 500,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [fadeAnim]);
 
   // Redirect once auth state is resolved
   useEffect(() => {
@@ -53,7 +52,7 @@ export default function LoginScreen() {
       user.role === 'worker' ? '/(worker)/tasks'      :
                                '/(dealer)/dashboard';
     router.replace(dest as any);
-  }, [user, token, isLoading]);
+  }, [user, token, isLoading, router]);
 
   const triggerShake = useCallback(() => {
     shakeAnim.setValue(0);

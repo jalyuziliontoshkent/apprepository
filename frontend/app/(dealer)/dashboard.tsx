@@ -29,7 +29,7 @@ export default function DealerDashboard() {
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleLogout = async () => {
     await authLogout();

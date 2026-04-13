@@ -42,7 +42,7 @@ export default function DealerChat() {
     } catch (e) { console.error(e); }
   }, [adminId]);
 
-  useEffect(() => { init(); }, []);
+  useEffect(() => { init(); }, [init]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => setAppState(state));

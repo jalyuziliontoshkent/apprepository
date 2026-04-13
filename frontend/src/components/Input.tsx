@@ -118,6 +118,8 @@ export const Input = memo<InputProps>(({
   );
 });
 
+Input.displayName = 'Input';
+
 const styles = StyleSheet.create({
   container: {
     width: '100%',

@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, FlatList,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator,
   KeyboardAvoidingView, Platform, AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Send } from 'lucide-react-native';
 import { api } from '../_layout';
 import { useTheme } from '../../src/utils/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuthStore } from '../../src/store/useAuthStore';
 
 export default function AdminChat() {
   const c = useTheme();
@@ -16,7 +16,7 @@ export default function AdminChat() {
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState('');
+  const userId = useAuthStore((state) => state.user?.id) ?? '';
   const [appState, setAppState] = useState(AppState.currentState);
   const scrollRef = useRef<ScrollView>(null);
   const intervalRef = useRef<any>(null);
@@ -25,8 +25,6 @@ export default function AdminChat() {
     try {
       const data = await api('/chat/partners', { cacheKey: 'admin-chat-partners', cacheTtlMs: 10000 });
       setPartners(data);
-      const userStr = await AsyncStorage.getItem('user');
-      if (userStr) setUserId(JSON.parse(userStr).id);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }, []);
@@ -39,7 +37,7 @@ export default function AdminChat() {
     } catch (e) { console.error(e); }
   }, []);
 
-  useEffect(() => { fetchPartners(); }, []);
+  useEffect(() => { fetchPartners(); }, [fetchPartners]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => setAppState(state));

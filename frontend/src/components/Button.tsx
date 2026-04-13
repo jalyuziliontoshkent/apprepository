@@ -119,6 +119,8 @@ export const Button = memo<ButtonProps>(({
   );
 });
 
+Button.displayName = 'Button';
+
 const styles = StyleSheet.create({
   base: {
     overflow: 'hidden',
