@@ -13,7 +13,7 @@ import { api } from '../src/services/apiClient';
 export { api };
 
 function AuthGuard() {
-  const { user, token, isLoading, initialize, logout, setUser } = useAuthStore();
+  const { user, token, isLoading, initialize, clearSession, setUser } = useAuthStore();
   const router = useRouter();
   const segments = useSegments();
 
@@ -24,7 +24,7 @@ function AuthGuard() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session?.access_token || !session.user) {
-        await logout();
+        await clearSession();
         return;
       }
 
@@ -52,7 +52,7 @@ function AuthGuard() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [initialize, logout, setUser]);
+  }, [clearSession, initialize, setUser]);
 
   useEffect(() => {
     if (isLoading) {

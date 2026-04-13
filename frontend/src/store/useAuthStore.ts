@@ -22,6 +22,7 @@ type AuthState = {
   isLoading: boolean;
   isHydrated: boolean;
   setUser: (user: User | null, token: string | null) => Promise<void>;
+  clearSession: () => Promise<void>;
   initialize: () => Promise<void>;
   checkSession: () => Promise<void>;
   logout: () => Promise<void>;
@@ -89,6 +90,23 @@ export const useAuthStore = create<AuthState>()(
         set({ user, token });
       },
 
+      clearSession: async () => {
+        await clearAllCache().catch(() => {});
+        await AsyncStorage.multiRemove([
+          AUTH_TOKEN_KEY,
+          AUTH_USER_KEY,
+          'auth-storage',
+          'sb-local-storage',
+        ]).catch(() => {});
+
+        set({
+          user: null,
+          token: null,
+          isLoading: false,
+          isHydrated: true,
+        });
+      },
+
       initialize: async () => {
         if (get().isHydrated) {
           return;
@@ -106,11 +124,11 @@ export const useAuthStore = create<AuthState>()(
           if (sessionSnapshot) {
             await get().setUser(sessionSnapshot.user, sessionSnapshot.token);
           } else {
-            await get().setUser(null, null);
+            await get().clearSession();
           }
         } catch (error) {
           console.error('[AuthStore] session restore failed', error);
-          await get().setUser(null, null);
+          await get().clearSession();
         } finally {
           set({ isLoading: false, isHydrated: true });
         }
@@ -124,21 +142,7 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           console.warn('[AuthStore] signOut warning', error);
         }
-
-        await clearAllCache().catch(() => {});
-        await AsyncStorage.multiRemove([
-          AUTH_TOKEN_KEY,
-          AUTH_USER_KEY,
-          'auth-storage',
-          'sb-local-storage',
-        ]).catch(() => {});
-
-        set({
-          user: null,
-          token: null,
-          isLoading: false,
-          isHydrated: true,
-        });
+        await get().clearSession();
       },
     }),
     {
