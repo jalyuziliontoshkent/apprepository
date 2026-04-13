@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { supabase } from '../lib/supabase';
 import { clearAllCache } from '../services/cache';
 
 export interface User {
@@ -43,43 +42,26 @@ const persistSessionSnapshot = async (user: User | null, token: string | null) =
   ]);
 };
 
-const buildUserFromSession = async (): Promise<{ user: User; token: string } | null> => {
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session?.access_token || !data.session.user) {
+const getPersistedSessionSnapshot = async (): Promise<{ user: User; token: string } | null> => {
+  try {
+    const [[, storedToken], [, storedUser]] = await AsyncStorage.multiGet([AUTH_TOKEN_KEY, AUTH_USER_KEY]);
+
+    if (!storedToken || !storedUser) {
+      return null;
+    }
+
+    return {
+      token: storedToken,
+      user: JSON.parse(storedUser) as User,
+    };
+  } catch {
     return null;
   }
-
-  const authUser = data.session.user;
-  const { data: profile, error: profileError } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', authUser.id)
-    .maybeSingle();
-
-  if (profileError && profileError.code !== 'PGRST116') {
-    throw profileError;
-  }
-
-  const user: User = {
-    id: authUser.id,
-    email: authUser.email ?? '',
-    role: (profile?.role ??
-      authUser.app_metadata?.role ??
-      authUser.user_metadata?.role ??
-      'dealer') as User['role'],
-    name: profile?.name ?? authUser.user_metadata?.name,
-    ...(profile ?? {}),
-  };
-
-  return {
-    user,
-    token: data.session.access_token,
-  };
 };
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       token: null,
       isLoading: true,
@@ -87,7 +69,12 @@ export const useAuthStore = create<AuthState>()(
 
       setUser: async (user, token) => {
         await persistSessionSnapshot(user, token).catch(() => {});
-        set({ user, token });
+        set({
+          user,
+          token,
+          isLoading: false,
+          isHydrated: true,
+        });
       },
 
       clearSession: async () => {
@@ -108,41 +95,62 @@ export const useAuthStore = create<AuthState>()(
       },
 
       initialize: async () => {
-        if (get().isHydrated) {
+        set({ isLoading: true });
+
+        const persistedSnapshot = await getPersistedSessionSnapshot();
+        if (persistedSnapshot) {
+          set({
+            user: persistedSnapshot.user,
+            token: persistedSnapshot.token,
+            isLoading: false,
+            isHydrated: true,
+          });
           return;
         }
 
-        await get().checkSession();
-        set({ isHydrated: true });
+        set({
+          user: null,
+          token: null,
+          isLoading: false,
+          isHydrated: true,
+        });
       },
 
       checkSession: async () => {
-        set({ isLoading: true });
-
-        try {
-          const sessionSnapshot = await buildUserFromSession();
-          if (sessionSnapshot) {
-            await get().setUser(sessionSnapshot.user, sessionSnapshot.token);
-          } else {
-            await get().clearSession();
-          }
-        } catch (error) {
-          console.error('[AuthStore] session restore failed', error);
-          await get().clearSession();
-        } finally {
-          set({ isLoading: false, isHydrated: true });
+        const persistedSnapshot = await getPersistedSessionSnapshot();
+        if (persistedSnapshot) {
+          set({
+            user: persistedSnapshot.user,
+            token: persistedSnapshot.token,
+            isLoading: false,
+            isHydrated: true,
+          });
+          return;
         }
+
+        set({
+          user: null,
+          token: null,
+          isLoading: false,
+          isHydrated: true,
+        });
       },
 
       logout: async () => {
-        set({ isLoading: true });
+        await clearAllCache().catch(() => {});
+        await AsyncStorage.multiRemove([
+          AUTH_TOKEN_KEY,
+          AUTH_USER_KEY,
+          'auth-storage',
+          'sb-local-storage',
+        ]).catch(() => {});
 
-        try {
-          await supabase.auth.signOut({ scope: 'global' });
-        } catch (error) {
-          console.warn('[AuthStore] signOut warning', error);
-        }
-        await get().clearSession();
+        set({
+          user: null,
+          token: null,
+          isLoading: false,
+          isHydrated: true,
+        });
       },
     }),
     {

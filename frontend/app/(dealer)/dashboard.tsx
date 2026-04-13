@@ -141,7 +141,7 @@ export default function DealerDashboard() {
           ) : orders.length === 0 ? (
             <StateView
               title="Buyurtmalar hali yo'q"
-              message="Birinchi buyurtmani yarating, keyin holatlar shu yerda ko‘rinadi."
+              message="Birinchi buyurtmani yarating, keyin holatlar shu yerda ko'rinadi."
               actionLabel="Buyurtma yaratish"
               onAction={() => router.push('/(dealer)/new-order')}
             />

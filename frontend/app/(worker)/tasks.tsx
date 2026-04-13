@@ -102,7 +102,7 @@ export default function WorkerTasks() {
         {error ? (
           <StateView title="Yuklashda xatolik" message={error} actionLabel="Qayta urinish" onAction={fetchTasks} />
         ) : tasks.length === 0 ? (
-          <StateView title="Hozircha vazifa yo'q" message="Yangi vazifa biriktirilganda shu yerda ko‘rinadi." />
+          <StateView title="Hozircha vazifa yo'q" message="Yangi vazifa biriktirilganda shu yerda ko'rinadi." />
         ) : (
           <SectionCard title="Bugungi ishlar" subtitle="Faqat bajarilishi kerak bo'lgan topshiriqlar">
             {tasks.map((task, i) => {

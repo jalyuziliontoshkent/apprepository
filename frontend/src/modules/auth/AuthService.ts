@@ -1,44 +1,45 @@
-import { supabase } from '../../lib/supabase';
+import { api } from '../../services/apiClient';
+import { ApiError, isApiError } from '../../services/errors';
 import { useAuthStore, User } from '../../store/useAuthStore';
+
+type LoginResponse = {
+  token: string;
+  user: User;
+};
+
+type MeResponse = {
+  user: User;
+};
+
+const normalizeUser = (user: User): User => ({
+  ...user,
+  id: String(user.id),
+  email: String(user.email ?? '').trim().toLowerCase(),
+  role: (user.role ?? 'dealer') as User['role'],
+});
 
 export const AuthService = {
   async login(email: string, password: string): Promise<User> {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
+    try {
+      const response = await api<LoginResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+        }),
+        dedup: false,
+      });
 
-    if (error) {
-      throw error;
+      const user = normalizeUser(response.user);
+      await useAuthStore.getState().setUser(user, response.token);
+      return user;
+    } catch (error) {
+      if (isApiError(error)) {
+        throw error;
+      }
+
+      throw new ApiError("Serverga ulanib bo'lmadi.", 'NETWORK');
     }
-
-    if (!data.session || !data.user) {
-      throw new Error('Sessiya yaratilmadi');
-    }
-
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', data.user.id)
-      .maybeSingle();
-
-    if (userError && userError.code !== 'PGRST116') {
-      throw new Error('Foydalanuvchi profilini olishda xatolik');
-    }
-
-    const user: User = {
-      id: data.user.id,
-      email: data.user.email ?? '',
-      role: (userData?.role ??
-        data.user.app_metadata?.role ??
-        data.user.user_metadata?.role ??
-        'dealer') as User['role'],
-      name: userData?.name ?? data.user.user_metadata?.name,
-      ...(userData ?? {}),
-    };
-
-    await useAuthStore.getState().setUser(user, data.session.access_token);
-    return user;
   },
 
   async logout(): Promise<void> {
@@ -46,12 +47,24 @@ export const AuthService = {
   },
 
   async refreshSession(): Promise<string | null> {
-    const { data, error } = await supabase.auth.refreshSession();
-    if (error || !data.session) {
+    const token = useAuthStore.getState().token;
+    if (!token) {
       return null;
     }
 
-    await useAuthStore.getState().setUser(useAuthStore.getState().user, data.session.access_token);
-    return data.session.access_token;
+    try {
+      const response = await api<MeResponse>('/auth/me', {
+        method: 'GET',
+        dedup: false,
+      });
+
+      await useAuthStore.getState().setUser(normalizeUser(response.user), token);
+      return token;
+    } catch (error) {
+      if (isApiError(error) && error.code === 'UNAUTHORIZED') {
+        await useAuthStore.getState().clearSession();
+      }
+      return null;
+    }
   },
 };

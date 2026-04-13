@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { Mail, Lock, AlertCircle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Input } from '../src/components/Input';
@@ -87,7 +88,7 @@ export default function LoginScreen() {
       // Redirect handled by useEffect above
     } catch (e: any) {
       const msg =
-        e?.message === 'Invalid login credentials'
+        e?.message === 'Invalid login credentials' || e?.message === "Email yoki parol noto'g'ri"
           ? 'Email yoki parol noto\'g\'ri.'
           : e?.message || 'Xatolik yuz berdi. Qayta urinib ko\'ring.';
       setError(msg);
@@ -126,15 +127,13 @@ export default function LoginScreen() {
 
           {/* Logo / Brand */}
           <View style={s.brand}>
-            <LinearGradient
-              colors={[c.primary, c.secondary]}
-              style={s.logoBox}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Text style={s.logoText}>M</Text>
-            </LinearGradient>
-            <Text style={[s.appName, { color: c.text }]}>Material CRM</Text>
+            <View style={[s.logoBox, { backgroundColor: '#000000' }]}>
+              <Image
+                source={require('../assets/images/lion-blinds-logo.jpg')}
+                style={s.logoImage}
+                contentFit="contain"
+              />
+            </View>
           </View>
 
           {/* Heading */}
@@ -158,7 +157,8 @@ export default function LoginScreen() {
 
             <Input
               label="Elektron pochta"
-              placeholder="admin@example.com"
+              placeholder="admin@curtain.uz"
+              hint="Masalan: admin@curtain.uz"
               value={email}
               onChangeText={(t) => { setEmail(t); setError(''); }}
               keyboardType="email-address"
@@ -211,25 +211,21 @@ const s = StyleSheet.create({
     gap: spacing.sm,
   },
   logoBox: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.xl,
+    width: 240,
+    height: 140,
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    paddingHorizontal: spacing.md,
   },
-  logoText: {
-    fontSize: 36,
-    fontWeight: '900',
-    color: '#fff',
-    letterSpacing: -1,
-  },
-  appName: {
-    ...typography.h3,
-    letterSpacing: -0.3,
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
 
   heading: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.xl + spacing.xs,
     alignItems: 'center',
   },
   title: {

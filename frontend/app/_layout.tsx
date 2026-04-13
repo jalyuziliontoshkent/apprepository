@@ -3,7 +3,6 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
-import { supabase } from '../src/lib/supabase';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 import { useAppStore } from '../src/utils/store';
@@ -13,49 +12,16 @@ import { api } from '../src/services/apiClient';
 export { api };
 
 function AuthGuard() {
-  const { user, token, isLoading, initialize, clearSession, setUser } = useAuthStore();
+  const { user, token, isLoading, isHydrated, initialize } = useAuthStore();
   const router = useRouter();
   const segments = useSegments();
 
   useEffect(() => {
-    initialize();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!session?.access_token || !session.user) {
-        await clearSession();
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', session.user.id)
-        .maybeSingle();
-
-      await setUser(
-        {
-          id: session.user.id,
-          email: session.user.email ?? '',
-          role: (profile?.role ??
-            session.user.app_metadata?.role ??
-            session.user.user_metadata?.role ??
-            'dealer') as 'admin' | 'dealer' | 'worker',
-          name: profile?.name ?? session.user.user_metadata?.name,
-          ...(profile ?? {}),
-        },
-        session.access_token,
-      );
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [clearSession, initialize, setUser]);
+    void initialize();
+  }, [initialize]);
 
   useEffect(() => {
-    if (isLoading) {
+    if (isLoading || !isHydrated) {
       return;
     }
 
@@ -81,7 +47,7 @@ function AuthGuard() {
 
       router.replace(destination as never);
     }
-  }, [isLoading, router, segments, token, user]);
+  }, [isHydrated, isLoading, router, segments, token, user]);
 
   return null;
 }
@@ -100,12 +66,13 @@ function RootNavigator() {
   const c = useTheme();
   const theme = useAppStore((s) => s.theme);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const isHydrated = useAuthStore((s) => s.isHydrated);
 
   return (
     <>
       <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
       <AuthGuard />
-      {isLoading ? (
+      {isLoading || !isHydrated ? (
         <LoadingSplash />
       ) : (
         <Stack

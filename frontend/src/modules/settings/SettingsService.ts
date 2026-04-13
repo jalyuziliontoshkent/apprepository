@@ -1,44 +1,72 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAppStore } from '../../utils/store';
 import { useAuthStore } from '../../store/useAuthStore';
-import { supabase } from '../../lib/supabase';
+
+type UserSettings = {
+  notifications: boolean;
+  theme: 'dark' | 'light';
+};
+
+const SETTINGS_KEY_PREFIX = 'user-settings:';
+
+const getSettingsKey = (userId: string) => `${SETTINGS_KEY_PREFIX}${userId}`;
+
+const defaultSettings = (): UserSettings => ({
+  notifications: true,
+  theme: useAppStore.getState().theme,
+});
 
 export const SettingsService = {
-  async fetchSettings() {
+  async fetchSettings(): Promise<UserSettings> {
     const userId = useAuthStore.getState().user?.id;
-    if (!userId) throw new Error('Not authenticated');
-
-    const { data, error } = await supabase
-      .from('user_settings')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      console.warn('[SettingsService] Failed to fetch settings, using defaults');
+    if (!userId) {
+      throw new Error('Not authenticated');
     }
 
-    return data ?? { notifications: true, theme: 'dark' };
+    try {
+      const raw = await AsyncStorage.getItem(getSettingsKey(userId));
+      if (!raw) {
+        return defaultSettings();
+      }
+
+      const parsed = JSON.parse(raw) as Partial<UserSettings>;
+      return {
+        notifications: parsed.notifications ?? true,
+        theme: parsed.theme === 'light' ? 'light' : 'dark',
+      };
+    } catch (error) {
+      console.warn('[SettingsService] Failed to read settings, using defaults', error);
+      return defaultSettings();
+    }
   },
 
-  async updateSettings(updates: Record<string, unknown>) {
+  async updateSettings(updates: Partial<UserSettings>): Promise<UserSettings> {
     const userId = useAuthStore.getState().user?.id;
-    if (!userId) throw new Error('Not authenticated');
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
 
-    const { data, error } = await supabase
-      .from('user_settings')
-      .upsert({ user_id: userId, ...updates }, { onConflict: 'user_id' })
-      .select()
-      .single();
+    const nextSettings = {
+      ...(await this.fetchSettings()),
+      ...updates,
+    };
 
-    if (error) throw error;
-    return data;
+    await AsyncStorage.setItem(getSettingsKey(userId), JSON.stringify(nextSettings));
+
+    if (nextSettings.theme !== useAppStore.getState().theme) {
+      await useAppStore.getState().toggleTheme();
+    }
+
+    return nextSettings;
   },
 
-  async deleteAccount() {
+  async deleteAccount(): Promise<void> {
     const userId = useAuthStore.getState().user?.id;
-    if (!userId) throw new Error('Not authenticated');
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
 
-    const { error } = await supabase.rpc('delete_user_account', { uid: userId });
-    if (error) throw error;
-    await useAuthStore.getState().logout();
+    await AsyncStorage.removeItem(getSettingsKey(userId)).catch(() => {});
+    await useAuthStore.getState().clearSession();
   },
 };
