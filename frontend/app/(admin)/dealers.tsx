@@ -3,9 +3,8 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, TextInput, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  Users, Plus, Trash2, X, Phone, Mail, CreditCard, DollarSign, History, ChevronDown,
+  Plus, Trash2, X, Phone, Mail, DollarSign, History,
 } from 'lucide-react-native';
 import { api } from '../_layout';
 import { useTheme, useCurrency } from '../../src/utils/theme';
@@ -36,7 +35,7 @@ export default function DealersScreen() {
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { fetchDealers(); }, []);
+  useEffect(() => { fetchDealers(); }, [fetchDealers]);
 
   const addDealer = async () => {
     if (!form.name || !form.email || !form.password) return;

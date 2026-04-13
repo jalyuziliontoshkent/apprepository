@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
-  ActivityIndicator, Modal, TextInput, Image, Alert, Platform,
+  ActivityIndicator, Modal, TextInput, Image, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus, X, Search, Upload, FolderPlus, Edit3, Trash2, Package } from 'lucide-react-native';
@@ -39,7 +39,7 @@ export default function AdminInventory() {
     }
     catch (e) { console.error(e); } finally { setLoading(false); setRefreshing(false); }
   }, []);
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const saveCat = async () => {
     if (!catForm.name.trim()) return;

@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckCircle, Hash, Ruler, Package } from 'lucide-react-native';
 import { api } from '../_layout';
-import { useTheme, useCurrency } from '../../src/utils/theme';
+import { useTheme } from '../../src/utils/theme';
 
 export default function WorkerCompleted() {
   const c = useTheme();

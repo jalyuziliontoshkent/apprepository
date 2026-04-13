@@ -35,7 +35,7 @@ export default function AdminOrders() {
     }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
-  useEffect(() => { fetchOrders(); }, []);
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
   const updateStatus = async (orderId: string, status: string, reason?: string) => {
     try { await api(`/orders/${orderId}/status`, { method: 'PUT', body: JSON.stringify({ status, rejection_reason: reason || '' }) }); fetchOrders(); setShowModal(false); setSelectedOrder(null); setRejectionReason(''); } catch (e) { console.error(e); }

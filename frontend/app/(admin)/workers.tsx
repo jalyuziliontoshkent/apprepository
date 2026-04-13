@@ -37,7 +37,7 @@ export default function AdminWorkers() {
       setRefreshing(false);
     }
   }, []);
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
   const addWorker = async () => { if (!wForm.name || !wForm.email || !wForm.password) return; try { await api('/workers', { method: 'POST', body: JSON.stringify(wForm) }); setShowAddWorker(false); setWForm({ name: '', email: '', password: '', phone: '', specialty: '' }); fetchAll(); } catch (e) { console.error(e); } };
   const assignItem = async (orderId: string, itemIdx: number, workerId: string) => { try { await api(`/orders/${orderId}/items/${itemIdx}/assign`, { method: 'PUT', body: JSON.stringify({ worker_id: workerId }) }); fetchAll(); } catch (e) { console.error(e); } };
   const assignDelivery = async () => { if (!selectedOrder || !dForm.driver_name) return; try { await api(`/orders/${selectedOrder.id}/delivery`, { method: 'PUT', body: JSON.stringify(dForm) }); setShowDelivery(false); setDForm({ driver_name: '', driver_phone: '', plate_number: '' }); fetchAll(); } catch (e) { console.error(e); } };

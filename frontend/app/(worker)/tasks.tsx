@@ -3,11 +3,11 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { LogOut, Hash, CheckCircle, Ruler, Package } from 'lucide-react-native';
 import { api } from '../_layout';
-import { useTheme, useCurrency } from '../../src/utils/theme';
+import { useTheme } from '../../src/utils/theme';
+import { useAuthStore } from '../../src/store/useAuthStore';
 
 export default function WorkerTasks() {
   const c = useTheme();
@@ -15,7 +15,8 @@ export default function WorkerTasks() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [userName, setUserName] = useState('');
+  const userName = useAuthStore((state) => state.user?.name) || 'Ishchi';
+  const logout = useAuthStore((state) => state.logout);
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
   const router = useRouter();
 
@@ -23,8 +24,6 @@ export default function WorkerTasks() {
     try {
       const data = await api('/worker/tasks', { cacheKey: 'worker-tasks-active', cacheTtlMs: 15000 });
       setTasks(data.filter((t: any) => t.worker_status !== 'completed'));
-      const u = await AsyncStorage.getItem('user');
-      if (u) setUserName(JSON.parse(u).name || 'Ishchi');
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
@@ -46,7 +45,7 @@ export default function WorkerTasks() {
   };
 
   const handleLogout = async () => {
-    await AsyncStorage.multiRemove(['token', 'user']);
+    await logout();
     router.replace('/');
   };
 
