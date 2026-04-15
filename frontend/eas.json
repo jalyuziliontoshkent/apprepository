@@ -5,12 +5,9 @@
     "requireCommit": true
   },
   "build": {
-    "base": {
-      "prebuildCommand": "chmod -R 644 . && chmod -R +X . || true"
-    },
     "development": {
-      "extends": "base",
       "developmentClient": true,
+      "prebuildCommand": "chmod -R 644 . && chmod -R +X . || true",
       "distribution": "internal",
       "environment": "development",
       "env": {
@@ -24,8 +21,8 @@
       }
     },
     "preview": {
-      "extends": "base",
       "distribution": "internal",
+      "prebuildCommand": "chmod -R 644 . && chmod -R +X . || true",
       "environment": "preview",
       "env": {
         "EAS_BUILD_NO_EXPO_GO_WARNING": "true",
@@ -41,12 +38,13 @@
       }
     },
     "production": {
-      "extends": ["base", "preview"],
+      "extends": "preview",
+      "prebuildCommand": "chmod -R 644 . && chmod -R +X . || true",
       "autoIncrement": true
     },
     "playstore": {
-      "extends": "base",
       "distribution": "store",
+      "prebuildCommand": "chmod -R 644 . && chmod -R +X . || true",
       "environment": "production",
       "autoIncrement": true,
       "env": {
