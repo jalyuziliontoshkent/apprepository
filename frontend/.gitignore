@@ -44,3 +44,4 @@ build_view.json
 last_build*.json
 build.log
 build_detail.txt
+eas-build-output.log
