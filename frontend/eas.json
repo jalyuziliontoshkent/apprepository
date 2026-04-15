@@ -5,7 +5,11 @@
     "requireCommit": true
   },
   "build": {
+    "base": {
+      "prebuildCommand": "chmod -R 644 . && chmod -R +X . || true"
+    },
     "development": {
+      "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
       "environment": "development",
@@ -20,6 +24,7 @@
       }
     },
     "preview": {
+      "extends": "base",
       "distribution": "internal",
       "environment": "preview",
       "env": {
@@ -36,10 +41,11 @@
       }
     },
     "production": {
-      "extends": "preview",
+      "extends": ["base", "preview"],
       "autoIncrement": true
     },
     "playstore": {
+      "extends": "base",
       "distribution": "store",
       "environment": "production",
       "autoIncrement": true,
