@@ -1,7 +1,7 @@
 import { PropsWithChildren, ReactNode } from 'react';
 import { StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { useTheme } from '../utils/theme';
-import { radius, spacing, typography } from '../theme/theme';
+import { radius, shadows, spacing, typography } from '../theme/theme';
 
 type SectionCardProps = PropsWithChildren<{
   title?: string;
@@ -14,7 +14,7 @@ export function SectionCard({ title, subtitle, right, style, children }: Section
   const c = useTheme();
 
   return (
-    <View style={[styles.card, { backgroundColor: c.card, borderColor: c.cardBorder }, style]}>
+    <View style={[styles.card, shadows.md, { backgroundColor: c.card, borderColor: c.cardBorder }, style]}>
       {(title || subtitle || right) ? (
         <View style={styles.header}>
           <View style={styles.headerText}>
@@ -34,6 +34,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.xl,
     padding: spacing.lg,
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',

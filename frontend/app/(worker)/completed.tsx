@@ -1,13 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, RefreshControl,
-} from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CheckCircle, Hash, Ruler } from 'lucide-react-native';
-import { api } from '../_layout';
-import { useTheme } from '../../src/utils/theme';
+import { CheckCircle, Ruler } from 'lucide-react-native';
+import { api } from '../../src/services/apiClient';
 import { SectionCard } from '../../src/components/SectionCard';
 import { StateView } from '../../src/components/StateView';
+import { useTheme } from '../../src/utils/theme';
 
 export default function WorkerCompleted() {
   const c = useTheme();
@@ -20,11 +18,10 @@ export default function WorkerCompleted() {
   const fetchTasks = useCallback(async () => {
     try {
       setError('');
-      const data = await api('/worker/tasks', { cacheKey: 'worker-tasks-completed', cacheTtlMs: 15000 });
-      setTasks(data.filter((t: any) => t.worker_status === 'completed'));
-    } catch (e: any) {
-      console.error(e);
-      setError(e?.message || 'Bajarilgan ishlar yuklanmadi');
+      const data = await api('/worker/tasks', { cacheKey: 'worker-tasks-completed', cacheTtlMs: 12000 });
+      setTasks(data.filter((item: any) => item.worker_status === 'completed'));
+    } catch (err: any) {
+      setError(err?.message || 'Bajarilgan ishlar yuklanmadi');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -37,76 +34,91 @@ export default function WorkerCompleted() {
 
   if (loading) {
     return (
-      <SafeAreaView style={s.c}>
-        <View style={s.centerWrap}>
-          <StateView title="Tarix yuklanmoqda" message="Bajarilgan topshiriqlar tayyorlanmoqda." loading />
+      <SafeAreaView style={s.container}>
+        <View style={s.centered}>
+          <StateView title="Tarix tayyorlanmoqda" message="Bajarilgan vazifalar yuklanmoqda." loading />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={s.c}>
-      <Text style={s.title}>Bajarilgan</Text>
-      <View style={s.countRow}>
-        <View style={s.countCard}>
-          <Text style={s.countVal}>{tasks.length}</Text>
-          <Text style={s.countLabel}>Bajarilgan vazifalar</Text>
-        </View>
-      </View>
+    <SafeAreaView style={s.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchTasks(); }} tintColor={c.text} />}
         contentContainerStyle={s.scroll}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchTasks(); }} tintColor={c.text} />}
       >
+        <SectionCard style={s.hero}>
+          <Text style={s.heroLabel}>Yakunlangan ishlar</Text>
+          <Text style={s.heroValue}>{tasks.length}</Text>
+          <Text style={s.heroMeta}>Bugungacha tugallangan topshiriqlar ro`yxati.</Text>
+        </SectionCard>
+
         {error ? (
           <StateView title="Yuklashda xatolik" message={error} actionLabel="Qayta urinish" onAction={fetchTasks} />
         ) : tasks.length === 0 ? (
-          <StateView title="Hali tarix bo'sh" message="Birinchi vazifa tugagach, u shu yerga tushadi." />
+          <StateView title="Tarix bo`sh" message="Birinchi vazifa tugagach, shu yerda ko`rinadi." />
         ) : (
-          <SectionCard title="Yakunlangan ishlar" subtitle="Tugatib bo'lingan topshiriqlar ro'yxati">
-            {tasks.map((task, i) => (
-              <View key={`${task.order_id}-${task.item_index}`} style={s.card} testID={`completed-${i}`}>
-                <View style={s.cardHead}>
-                  <View style={s.codeBadge}>
-                    <Hash size={11} color={c.success} />
-                    <Text style={s.codeText}>{task.order_code}</Text>
-                  </View>
+          <SectionCard title="Bajarilgan topshiriqlar" subtitle="Yaqin tarix">
+            {tasks.map((task) => (
+              <View key={`${task.order_id}-${task.item_index}`} style={s.taskCard}>
+                <View style={s.taskTop}>
+                  <Text style={s.taskCode}>{task.order_code}</Text>
                   <View style={s.doneBadge}>
-                    <CheckCircle size={12} color={c.success} />
+                    <CheckCircle size={14} color={c.success} />
                     <Text style={s.doneText}>Bajarildi</Text>
                   </View>
                 </View>
-                <Text style={s.material}>{task.material_name}</Text>
-                <View style={s.sizeRow}>
+                <Text style={s.taskMaterial}>{task.material_name}</Text>
+                <View style={s.taskInfo}>
                   <Ruler size={14} color={c.textSec} />
-                  <Text style={s.size}>{task.width}m x {task.height}m = {task.sqm} kv.m</Text>
+                  <Text style={s.taskInfoText}>{task.width}m x {task.height}m = {task.sqm} kv.m</Text>
                 </View>
               </View>
             ))}
           </SectionCard>
         )}
+
+        <View style={s.bottomGap} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const createStyles = (c: any) => StyleSheet.create({
-  c: { flex: 1, backgroundColor: c.bg },
-  centerWrap: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
-  title: { fontSize: 26, fontWeight: '800', color: c.text, paddingHorizontal: 24, paddingTop: 16, letterSpacing: -0.5 },
-  countRow: { paddingHorizontal: 24, marginTop: 12 },
-  countCard: { backgroundColor: c.successSoft, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: `${c.success}30` },
-  countVal: { fontSize: 32, fontWeight: '800', color: c.success },
-  countLabel: { fontSize: 12, color: c.textSec, fontWeight: '600', marginTop: 2 },
-  scroll: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 100 },
-  card: { backgroundColor: 'transparent', borderRadius: 20, borderWidth: 1, borderColor: c.cardBorder, padding: 18, marginBottom: 12 },
-  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  codeBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.successSoft, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  codeText: { fontSize: 12, fontWeight: '800', color: c.success, letterSpacing: 1, fontVariant: ['tabular-nums'] },
-  doneBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  doneText: { fontSize: 11, fontWeight: '700', color: c.success },
-  material: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: 8 },
-  sizeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  size: { fontSize: 14, color: c.textSec },
+const createStyles = (c: ReturnType<typeof useTheme>) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg },
+  centered: { flex: 1, paddingHorizontal: 22, justifyContent: 'center' },
+  scroll: { paddingHorizontal: 22, paddingTop: 16, paddingBottom: 108, gap: 14 },
+  hero: { padding: 22 },
+  heroLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: c.textSec,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  heroValue: { fontSize: 40, fontWeight: '900', color: c.text, marginTop: 10 },
+  heroMeta: { fontSize: 14, color: c.textSec, marginTop: 8 },
+  taskCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    backgroundColor: c.inputBg,
+    padding: 16,
+    marginBottom: 12,
+  },
+  taskTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  taskCode: { fontSize: 13, fontWeight: '900', color: c.text, letterSpacing: 1 },
+  doneBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  doneText: { fontSize: 12, fontWeight: '800', color: c.success },
+  taskMaterial: { fontSize: 18, fontWeight: '800', color: c.text, marginTop: 12 },
+  taskInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  taskInfoText: { fontSize: 14, color: c.textSec },
+  bottomGap: { height: 10 },
 });

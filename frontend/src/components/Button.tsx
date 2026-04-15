@@ -46,7 +46,7 @@ export const Button = memo<ButtonProps>(({
       <TouchableOpacity
         style={[
           styles.base,
-          { borderRadius: radius.full, height: h },
+          { borderRadius: radius.full, height: h, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
           shadows.md,
           isDisabled && styles.disabled,
           style,
@@ -94,8 +94,8 @@ export const Button = memo<ButtonProps>(({
           borderRadius: radius.full,
           height: h,
           backgroundColor: flatBg,
-          borderWidth: variant === 'outline' ? 1.5 : 0,
-          borderColor: variant === 'outline' ? c.primary : 'transparent',
+          borderWidth: variant === 'ghost' ? 0 : 1.2,
+          borderColor: variant === 'outline' ? c.primary : c.cardBorder,
         },
         isDisabled && styles.disabled,
         style,

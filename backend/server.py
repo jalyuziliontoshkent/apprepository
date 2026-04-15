@@ -5,11 +5,12 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, UploadFile, File
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.cors import CORSMiddleware
 import asyncpg, aiofiles, uuid, asyncio, io
-import os, logging, bcrypt, jwt, secrets, string, json
+import os, logging, bcrypt, jwt, secrets, string, json, math
 import ssl
 import certifi
 import httpx
@@ -24,6 +25,10 @@ from modules.common.logging import configure_logging
 from modules.common.middleware import install_middleware
 
 logger = configure_logging()
+
+ORDER_BILLING_STEP_SQM = 0.5
+KEEP_ALIVE_INTERVAL_SECONDS = 60
+INVENTORY_SYNC_STATUSES = {"tayyor", "yetkazilmoqda", "yetkazildi"}
 
 
 def load_database_url() -> str:
@@ -86,7 +91,14 @@ def asyncpg_ssl_context_for_dsn(dsn: str) -> Optional[ssl.SSLContext]:
 
 
 def asyncpg_pool_kwargs():
-    kw = dict(min_size=2, max_size=10, statement_cache_size=0)
+    kw = dict(
+        min_size=1,
+        max_size=10,
+        statement_cache_size=0,
+        command_timeout=60,
+        timeout=20,
+        max_inactive_connection_lifetime=120,
+    )
     ctx = asyncpg_ssl_context_for_dsn(DATABASE_URL)
     if ctx is not None:
         kw["ssl"] = ctx
@@ -142,7 +154,7 @@ pool: asyncpg.Pool = None
 
 async def get_pool() -> asyncpg.Pool:
     global pool
-    if pool is None:
+    if pool is None or pool._closed:
         pool = await asyncpg.create_pool(DATABASE_URL, **asyncpg_pool_kwargs())
     return pool
 
@@ -161,6 +173,136 @@ def row_to_dict(row):
     if row is None:
         return None
     return dict(row)
+
+
+def round_money(value: float) -> float:
+    return round(float(value or 0) + 1e-9, 2)
+
+
+def to_billable_sqm(area: float) -> float:
+    area = max(float(area or 0), 0.0)
+    if area <= 0:
+        return 0.0
+    return round(math.ceil((area - 1e-9) / ORDER_BILLING_STEP_SQM) * ORDER_BILLING_STEP_SQM, 2)
+
+
+def parse_json_field(value, default=None):
+    if value in (None, ""):
+        return default
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return default if default is not None else value
+    return value
+
+
+def serialize_order_record(row):
+    order = row_to_dict(row)
+    if order is None:
+        return None
+    order["id"] = str(order["id"])
+    order["dealer_id"] = str(order["dealer_id"])
+    order["items"] = parse_json_field(order.get("items"), default=[]) or []
+    order["delivery_info"] = parse_json_field(order.get("delivery_info"), default=None)
+    return order
+
+
+def format_export_datetime(value) -> str:
+    if value in (None, ""):
+        return ""
+    if isinstance(value, datetime):
+        return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M")
+    text = str(value)
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        return parsed.strftime("%Y-%m-%d %H:%M")
+    except ValueError:
+        return text[:16].replace("T", " ")
+
+
+def build_order_item(it) -> dict:
+    exact_sqm = max(float(it.width), 0) * max(float(it.height), 0) * max(int(it.quantity), 0)
+    billable_sqm = to_billable_sqm(exact_sqm)
+    price = round_money(billable_sqm * float(it.price_per_sqm))
+    return {
+        "material_id": str(it.material_id),
+        "material_name": it.material_name,
+        "width": float(it.width),
+        "height": float(it.height),
+        "quantity": int(it.quantity),
+        "exact_sqm": round(exact_sqm, 4),
+        "billable_sqm": billable_sqm,
+        "sqm": billable_sqm,
+        "price_per_sqm": float(it.price_per_sqm),
+        "price": price,
+        "notes": getattr(it, "notes", ""),
+        "assigned_worker_id": "",
+        "assigned_worker_name": "",
+        "worker_status": "pending",
+    }
+
+
+async def deduct_inventory_for_order(conn, order_row, now: str):
+    order = row_to_dict(order_row)
+    if order is None:
+        raise HTTPException(404, "Buyurtma topilmadi")
+    if order.get("inventory_deducted"):
+        return
+
+    items = parse_json_field(order.get("items"), default=[]) or []
+    required_by_material = {}
+
+    for item in items:
+        material_id = item.get("material_id")
+        sqm = float(item.get("billable_sqm") or item.get("sqm") or 0)
+        if not material_id or sqm <= 0:
+            continue
+        mid = int(material_id)
+        required_by_material[mid] = round_money(required_by_material.get(mid, 0) + sqm)
+
+    if not required_by_material:
+        await conn.execute(
+            "UPDATE orders SET inventory_deducted = TRUE, updated_at = $1 WHERE id = $2",
+            now,
+            int(order["id"]),
+        )
+        return
+
+    material_ids = list(required_by_material.keys())
+    material_rows = await conn.fetch(
+        "SELECT id, name, stock_quantity, unit FROM materials WHERE id = ANY($1::int[])",
+        material_ids,
+    )
+    materials = {int(row["id"]): row for row in material_rows}
+    shortages = []
+
+    for material_id, required_sqm in required_by_material.items():
+        material = materials.get(material_id)
+        if material is None:
+            shortages.append(f"Material topilmadi: #{material_id}")
+            continue
+        available = float(material["stock_quantity"] or 0)
+        if available + 1e-9 < required_sqm:
+            shortages.append(
+                f"{material['name']} omborda yetarli emas ({round_money(available)} {material['unit']} bor, {required_sqm} kerak)"
+            )
+
+    if shortages:
+        raise HTTPException(400, "; ".join(shortages))
+
+    for material_id, required_sqm in required_by_material.items():
+        await conn.execute(
+            "UPDATE materials SET stock_quantity = stock_quantity - $1 WHERE id = $2",
+            required_sqm,
+            material_id,
+        )
+
+    await conn.execute(
+        "UPDATE orders SET inventory_deducted = TRUE, updated_at = $1 WHERE id = $2",
+        now,
+        int(order["id"]),
+    )
 
 async def get_current_user(request: Request) -> dict:
     auth = request.headers.get("Authorization", "")
@@ -540,28 +682,52 @@ async def delete_material(mid: str, admin: dict = Depends(require_admin)):
 # ─── ORDERS ───
 @api_router.post("/orders")
 async def create_order(data: OrderCreate, user: dict = Depends(get_current_user)):
-    if user.get("role") != "dealer": raise HTTPException(403, "Faqat dilerlar")
-    db = await get_pool()
-    items = []; total_price = 0; total_sqm = 0
+    if user.get("role") != "dealer":
+        raise HTTPException(403, "Faqat dilerlar")
+    if not data.items:
+        raise HTTPException(400, "Buyurtmada kamida bitta mahsulot bo'lishi kerak")
+
+    pool = await get_pool()
+    items = []
+    total_price = 0.0
+    total_sqm = 0.0
+
     for it in data.items:
-        sqm = it.width * it.height * it.quantity
-        price = sqm * it.price_per_sqm
-        total_sqm += sqm; total_price += price
-        items.append({"material_id": it.material_id, "material_name": it.material_name, "width": it.width, "height": it.height, "quantity": it.quantity, "sqm": round(sqm, 2), "price_per_sqm": it.price_per_sqm, "price": round(price, 2), "notes": it.notes, "assigned_worker_id": "", "assigned_worker_name": "", "worker_status": "pending"})
+        order_item = build_order_item(it)
+        if order_item["sqm"] <= 0:
+            raise HTTPException(400, f"{it.material_name} uchun maydon 0 dan katta bo'lishi kerak")
+        items.append(order_item)
+        total_sqm += order_item["sqm"]
+        total_price += order_item["price"]
+
     order_code = generate_order_code()
     now = datetime.now(timezone.utc).isoformat()
-    row = await db.fetchrow(
-        "INSERT INTO orders (order_code, dealer_id, dealer_name, items, total_sqm, total_price, status, notes, rejection_reason, delivery_info, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *",
-        order_code, int(user["id"]), user.get("name", ""), json.dumps(items), round(total_sqm, 2), round(total_price, 2), "kutilmoqda", data.notes, "", None, now, now
-    )
-    o = row_to_dict(row)
-    o["id"] = str(o["id"])
-    o["dealer_id"] = str(o["dealer_id"])
-    o["items"] = json.loads(o["items"]) if isinstance(o["items"], str) else o["items"]
-    o["delivery_info"] = json.loads(o["delivery_info"]) if isinstance(o["delivery_info"], str) and o["delivery_info"] else o["delivery_info"]
-    await db.execute("UPDATE users SET debt = debt + $1 WHERE id = $2", total_price, int(user["id"]))
+
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                "INSERT INTO orders (order_code, dealer_id, dealer_name, items, total_sqm, total_price, status, notes, rejection_reason, delivery_info, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *",
+                order_code,
+                int(user["id"]),
+                user.get("name", ""),
+                json.dumps(items),
+                round_money(total_sqm),
+                round_money(total_price),
+                "kutilmoqda",
+                data.notes,
+                "",
+                None,
+                now,
+                now,
+            )
+            await conn.execute(
+                "UPDATE users SET debt = debt + $1 WHERE id = $2",
+                round_money(total_price),
+                int(user["id"]),
+            )
+
     cache.invalidate("orders", "stats", "reports")
-    return o
+    return serialize_order_record(row)
 
 @api_router.get("/orders")
 async def list_orders(user: dict = Depends(get_current_user)):
@@ -573,14 +739,7 @@ async def list_orders(user: dict = Depends(get_current_user)):
         rows = await db.fetch("SELECT * FROM orders WHERE dealer_id = $1 ORDER BY created_at DESC", int(user["id"]))
     else:
         rows = await db.fetch("SELECT * FROM orders ORDER BY created_at DESC")
-    out = []
-    for r in rows:
-        o = row_to_dict(r)
-        o["id"] = str(o["id"])
-        o["dealer_id"] = str(o["dealer_id"])
-        o["items"] = json.loads(o["items"]) if isinstance(o["items"], str) else o["items"]
-        o["delivery_info"] = json.loads(o["delivery_info"]) if isinstance(o["delivery_info"], str) and o["delivery_info"] else o["delivery_info"]
-        out.append(o)
+    out = [serialize_order_record(r) for r in rows]
     cache.set(cache_key, out, 15)
     return out
 
@@ -589,32 +748,47 @@ async def get_order(oid: str, user: dict = Depends(get_current_user)):
     db = await get_pool()
     o = await db.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
     if not o: raise HTTPException(404, "Not found")
-    o = row_to_dict(o)
+    o = serialize_order_record(o)
     if user.get("role") == "dealer" and str(o["dealer_id"]) != user["id"]: raise HTTPException(403)
-    o["id"] = str(o["id"])
-    o["dealer_id"] = str(o["dealer_id"])
-    o["items"] = json.loads(o["items"]) if isinstance(o["items"], str) else o["items"]
-    o["delivery_info"] = json.loads(o["delivery_info"]) if isinstance(o["delivery_info"], str) and o["delivery_info"] else o["delivery_info"]
     return o
 
 @api_router.put("/orders/{oid}/status")
 async def update_order_status(oid: str, data: OrderStatusUpdate, admin: dict = Depends(require_admin)):
     valid = ["kutilmoqda","tasdiqlangan","tayyorlanmoqda","tayyor","yetkazilmoqda","yetkazildi","rad_etilgan"]
-    if data.status not in valid: raise HTTPException(400, "Invalid status")
-    db = await get_pool()
+    if data.status not in valid:
+        raise HTTPException(400, "Invalid status")
+
+    pool = await get_pool()
     now = datetime.now(timezone.utc).isoformat()
-    if data.status == "rad_etilgan" and data.rejection_reason:
-        await db.execute("UPDATE orders SET status = $1, rejection_reason = $2, updated_at = $3 WHERE id = $4", data.status, data.rejection_reason, now, int(oid))
-    else:
-        await db.execute("UPDATE orders SET status = $1, updated_at = $2 WHERE id = $3", data.status, now, int(oid))
-    o = await db.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
-    o = row_to_dict(o)
-    o["id"] = str(o["id"])
-    o["dealer_id"] = str(o["dealer_id"])
-    o["items"] = json.loads(o["items"]) if isinstance(o["items"], str) else o["items"]
-    o["delivery_info"] = json.loads(o["delivery_info"]) if isinstance(o["delivery_info"], str) and o["delivery_info"] else o["delivery_info"]
-    cache.invalidate("orders", "stats", "reports")
-    return o
+
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            order = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+            if not order:
+                raise HTTPException(404, "Not found")
+
+            if data.status in INVENTORY_SYNC_STATUSES:
+                await deduct_inventory_for_order(conn, order, now)
+
+            if data.status == "rad_etilgan" and data.rejection_reason:
+                await conn.execute(
+                    "UPDATE orders SET status = $1, rejection_reason = $2, updated_at = $3 WHERE id = $4",
+                    data.status,
+                    data.rejection_reason,
+                    now,
+                    int(oid),
+                )
+            else:
+                await conn.execute(
+                    "UPDATE orders SET status = $1, updated_at = $2 WHERE id = $3",
+                    data.status,
+                    now,
+                    int(oid),
+                )
+            updated = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+
+    cache.invalidate("orders", "stats", "reports", "materials", "alerts")
+    return serialize_order_record(updated)
 
 # ─── WORKER: Assign item to worker ───
 @api_router.put("/orders/{oid}/items/{item_idx}/assign")
@@ -657,93 +831,94 @@ async def get_worker_tasks(user: dict = Depends(get_current_user)):
 # ─── WORKER: Mark item as completed ───
 @api_router.put("/worker/tasks/{oid}/{item_idx}/complete")
 async def complete_worker_task(oid: str, item_idx: int, user: dict = Depends(get_current_user)):
-    if user.get("role") != "worker": raise HTTPException(403)
-    db = await get_pool()
-    order = await db.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
-    if not order: raise HTTPException(404)
-    items = json.loads(order["items"]) if isinstance(order["items"], str) else order["items"]
-    if item_idx >= len(items): raise HTTPException(400)
-    if items[item_idx].get("assigned_worker_id") != user["id"]: raise HTTPException(403, "Not your task")
-    if items[item_idx].get("worker_status") == "completed":
-        # Already completed - return current order without error
-        o = row_to_dict(order)
-        o["id"] = str(o["id"]); o["dealer_id"] = str(o["dealer_id"])
-        o["items"] = items
-        o["delivery_info"] = json.loads(o["delivery_info"]) if isinstance(o["delivery_info"], str) and o["delivery_info"] else o["delivery_info"]
-        return o
-    items[item_idx]["worker_status"] = "completed"
+    if user.get("role") != "worker":
+        raise HTTPException(403)
+    pool = await get_pool()
     now = datetime.now(timezone.utc).isoformat()
-    await db.execute("UPDATE orders SET items = $1, updated_at = $2 WHERE id = $3", json.dumps(items), now, int(oid))
-
-    # Check if all assigned items are completed
-    all_done = all(it.get("worker_status") == "completed" for it in items if it.get("assigned_worker_id"))
-    if all_done:
-        await db.execute("UPDATE orders SET status = 'tayyor', updated_at = $1 WHERE id = $2", now, int(oid))
-        # Send auto-message to dealer
-        admin = await db.fetchrow("SELECT id, name FROM users WHERE role = 'admin' LIMIT 1")
-        if admin and order["dealer_id"]:
-            await db.execute(
-                "INSERT INTO messages (sender_id, sender_name, sender_role, receiver_id, text, read, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
-                admin["id"], admin["name"] or "Admin", "admin", order["dealer_id"],
-                f"Buyurtma #{order['order_code']} tayyor! Barcha ishlar tugallandi.",
-                False, now
-            )
-        logger.info(f"Buyurtma #{order['order_code']} tayyor — dilerga xabar yuborildi")
-    else:
-        # Single item completed — notify admin via message
-        admin = await db.fetchrow("SELECT id FROM users WHERE role = 'admin' LIMIT 1")
-        if admin:
-            completed_count = sum(1 for it in items if it.get("worker_status") == "completed")
-            total_assigned = sum(1 for it in items if it.get("assigned_worker_id"))
-            await db.execute(
-                "INSERT INTO messages (sender_id, sender_name, sender_role, receiver_id, text, read, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
-                int(user["id"]), user.get("name", "Ishchi"), "worker", admin["id"],
-                f"#{order['order_code']}: {items[item_idx]['material_name']} tayyor ({completed_count}/{total_assigned})",
-                False, now
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            order = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+            if not order:
+                raise HTTPException(404)
+            items = parse_json_field(order["items"], default=[]) or []
+            if item_idx >= len(items):
+                raise HTTPException(400)
+            if items[item_idx].get("assigned_worker_id") != user["id"]:
+                raise HTTPException(403, "Not your task")
+            if items[item_idx].get("worker_status") == "completed":
+                current = serialize_order_record(order)
+                current["items"] = items
+                return current
+            items[item_idx]["worker_status"] = "completed"
+            await conn.execute(
+                "UPDATE orders SET items = $1, updated_at = $2 WHERE id = $3",
+                json.dumps(items),
+                now,
+                int(oid),
             )
 
-    o = await db.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
-    o = row_to_dict(o)
-    o["id"] = str(o["id"]); o["dealer_id"] = str(o["dealer_id"])
-    o["items"] = json.loads(o["items"]) if isinstance(o["items"], str) else o["items"]
-    o["delivery_info"] = json.loads(o["delivery_info"]) if isinstance(o["delivery_info"], str) and o["delivery_info"] else o["delivery_info"]
-    cache.invalidate("orders", "stats", "reports")
-    return o
+            all_done = all(it.get("worker_status") == "completed" for it in items if it.get("assigned_worker_id"))
+            if all_done:
+                refreshed_order = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+                await deduct_inventory_for_order(conn, refreshed_order, now)
+                await conn.execute("UPDATE orders SET status = 'tayyor', updated_at = $1 WHERE id = $2", now, int(oid))
+                admin_row = await conn.fetchrow("SELECT id, name FROM users WHERE role = 'admin' LIMIT 1")
+                if admin_row and order["dealer_id"]:
+                    await conn.execute(
+                        "INSERT INTO messages (sender_id, sender_name, sender_role, receiver_id, text, read, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+                        admin_row["id"], admin_row["name"] or "Admin", "admin", order["dealer_id"],
+                        f"Buyurtma #{order['order_code']} tayyor! Barcha ishlar tugallandi.",
+                        False, now
+                    )
+                logger.info("Buyurtma #%s tayyor - dilerga xabar yuborildi", order["order_code"])
+            else:
+                admin_row = await conn.fetchrow("SELECT id FROM users WHERE role = 'admin' LIMIT 1")
+                if admin_row:
+                    completed_count = sum(1 for it in items if it.get("worker_status") == "completed")
+                    total_assigned = sum(1 for it in items if it.get("assigned_worker_id"))
+                    await conn.execute(
+                        "INSERT INTO messages (sender_id, sender_name, sender_role, receiver_id, text, read, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+                        int(user["id"]), user.get("name", "Ishchi"), "worker", admin_row["id"],
+                        f"#{order['order_code']}: {items[item_idx]['material_name']} tayyor ({completed_count}/{total_assigned})",
+                        False, now
+                    )
 
+            updated = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+
+    cache.invalidate("orders", "stats", "reports", "materials", "alerts")
+    return serialize_order_record(updated)
 # ─── DELIVERY: Assign delivery info directly to order ───
 @api_router.put("/orders/{oid}/delivery")
 async def assign_delivery(oid: str, data: DeliveryInfoReq, admin: dict = Depends(require_admin)):
-    db = await get_pool()
-    order = await db.fetchrow("SELECT id FROM orders WHERE id = $1", int(oid))
-    if not order: raise HTTPException(404, "Buyurtma topilmadi")
+    pool = await get_pool()
     d_info = json.dumps({"driver_name": data.driver_name, "driver_phone": data.driver_phone, "plate_number": data.plate_number})
     now = datetime.now(timezone.utc).isoformat()
-    await db.execute("UPDATE orders SET delivery_info = $1, status = 'yetkazilmoqda', updated_at = $2 WHERE id = $3", d_info, now, int(oid))
-    o = await db.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
-    o = row_to_dict(o)
-    o["id"] = str(o["id"])
-    o["dealer_id"] = str(o["dealer_id"])
-    o["items"] = json.loads(o["items"]) if isinstance(o["items"], str) else o["items"]
-    o["delivery_info"] = json.loads(o["delivery_info"]) if isinstance(o["delivery_info"], str) and o["delivery_info"] else o["delivery_info"]
-    cache.invalidate("orders", "stats")
-    return o
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            order = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+            if not order:
+                raise HTTPException(404, "Buyurtma topilmadi")
+            await deduct_inventory_for_order(conn, order, now)
+            await conn.execute("UPDATE orders SET delivery_info = $1, status = 'yetkazilmoqda', updated_at = $2 WHERE id = $3", d_info, now, int(oid))
+            updated = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+    cache.invalidate("orders", "stats", "materials", "alerts")
+    return serialize_order_record(updated)
 
 # ─── DELIVERY: Admin confirms delivery ───
 @api_router.put("/orders/{oid}/confirm-delivery")
 async def confirm_delivery(oid: str, admin: dict = Depends(require_admin)):
-    db = await get_pool()
-    order = await db.fetchrow("SELECT id FROM orders WHERE id = $1", int(oid))
-    if not order: raise HTTPException(404, "Buyurtma topilmadi")
+    pool = await get_pool()
     now = datetime.now(timezone.utc).isoformat()
-    await db.execute("UPDATE orders SET status = 'yetkazildi', updated_at = $1 WHERE id = $2", now, int(oid))
-    o = await db.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
-    o = row_to_dict(o)
-    o["id"] = str(o["id"])
-    o["dealer_id"] = str(o["dealer_id"])
-    o["items"] = json.loads(o["items"]) if isinstance(o["items"], str) else o["items"]
-    o["delivery_info"] = json.loads(o["delivery_info"]) if isinstance(o["delivery_info"], str) and o["delivery_info"] else o["delivery_info"]
-    cache.invalidate("orders", "stats", "reports")
-    return o
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            order = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+            if not order:
+                raise HTTPException(404, "Buyurtma topilmadi")
+            await deduct_inventory_for_order(conn, order, now)
+            await conn.execute("UPDATE orders SET status = 'yetkazildi', updated_at = $1 WHERE id = $2", now, int(oid))
+            updated = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+    cache.invalidate("orders", "stats", "reports", "materials", "alerts")
+    return serialize_order_record(updated)
 
 # ─── CHAT ───
 @api_router.post("/messages")
@@ -913,6 +1088,7 @@ async def create_tables(db):
             total_sqm FLOAT DEFAULT 0,
             total_price FLOAT DEFAULT 0,
             status TEXT DEFAULT 'kutilmoqda',
+            inventory_deducted BOOLEAN NOT NULL DEFAULT FALSE,
             notes TEXT DEFAULT '',
             rejection_reason TEXT DEFAULT '',
             delivery_info TEXT,
@@ -920,6 +1096,10 @@ async def create_tables(db):
             updated_at TEXT DEFAULT ''
         )
     """)
+    try:
+        await db.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS inventory_deducted BOOLEAN NOT NULL DEFAULT FALSE")
+    except Exception:
+        pass
     await db.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id SERIAL PRIMARY KEY,
@@ -1114,7 +1294,7 @@ async def export_orders_excel(admin: dict = Depends(require_admin)):
 
     # Styling
     header_font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
-    header_fill = PatternFill(start_color='6C63FF', end_color='6C63FF', fill_type='solid')
+    header_fill = PatternFill(start_color='FF453A', end_color='FF453A', fill_type='solid')
     border = Border(
         left=Side(style='thin', color='DDDDDD'),
         right=Side(style='thin', color='DDDDDD'),
@@ -1131,11 +1311,23 @@ async def export_orders_excel(admin: dict = Depends(require_admin)):
         cell.border = border
 
     for idx, order in enumerate(orders, 1):
-        items = json.loads(order["items"]) if isinstance(order["items"], str) else order["items"]
-        item_names = ", ".join([f'{it["material_name"]} ({it.get("width", 0)}x{it.get("height", 0)}m)' for it in items])
+        items = parse_json_field(order["items"], default=[]) or []
+        item_names = ", ".join([
+            f'{it.get("material_name", "")} ({it.get("width", 0)}x{it.get("height", 0)}m, {it.get("sqm", 0)} kv.m)'
+            for it in items
+        ])
         status_map = {"kutilmoqda": "Kutilmoqda", "tasdiqlangan": "Tasdiqlangan", "tayyorlanmoqda": "Tayyorlanmoqda", "tayyor": "Tayyor", "yetkazilmoqda": "Yetkazilmoqda", "yetkazildi": "Yetkazildi", "rad_etilgan": "Rad etilgan"}
 
-        row = [idx, order["order_code"], order["dealer_name"], item_names, round(order["total_sqm"], 2), round(order["total_price"], 2), status_map.get(order["status"], order["status"]), order["created_at"][:16].replace("T", " ")]
+        row = [
+            idx,
+            order["order_code"],
+            order["dealer_name"],
+            item_names,
+            round_money(order["total_sqm"]),
+            round_money(order["total_price"]),
+            status_map.get(order["status"], order["status"]),
+            format_export_datetime(order["created_at"]),
+        ]
         for col, val in enumerate(row, 1):
             cell = ws.cell(row=idx+1, column=col, value=val)
             cell.border = border
@@ -1196,12 +1388,18 @@ async def get_dealer_payments(did: str, admin: dict = Depends(require_admin)):
 # ─── HEALTH CHECK ───
 @api_router.get("/health")
 async def health_check():
+    started_at = _time.perf_counter()
     try:
         db = await get_pool()
         await db.fetchval("SELECT 1")
-        return {"status": "ok", "database": "connected", "time": datetime.now(timezone.utc).isoformat()}
+        latency_ms = round((_time.perf_counter() - started_at) * 1000, 2)
+        return {"status": "ok", "database": "connected", "latency_ms": latency_ms, "time": datetime.now(timezone.utc).isoformat()}
     except Exception as e:
-        return {"status": "error", "database": str(e)}
+        latency_ms = round((_time.perf_counter() - started_at) * 1000, 2)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "database": str(e), "latency_ms": latency_ms},
+        )
 
 @api_router.get("/settings/me")
 async def get_settings(user: dict = Depends(get_current_user)):
@@ -1241,10 +1439,10 @@ async def update_settings(request: Request, user: dict = Depends(get_current_use
 
 # ─── KEEP ALIVE - PostgreSQL uxlab qolmasligi uchun ───
 async def keep_alive_task():
-    """Har 5 daqiqada PostgreSQL'ga ping yuborib, uxlab qolmasligini ta'minlaydi"""
+    """Backend va DB uyg'oq turishi uchun qisqa intervalda ping yuboradi."""
     while True:
         try:
-            await asyncio.sleep(300)  # 5 daqiqa
+            await asyncio.sleep(KEEP_ALIVE_INTERVAL_SECONDS)
             db = await get_pool()
             await db.fetchval("SELECT 1")
             logger.debug("Keep-alive: PostgreSQL OK")
@@ -1271,4 +1469,5 @@ async def shutdown():
         await pool.close()
 
 app.include_router(api_router)
+app.add_middleware(GZipMiddleware, minimum_size=800)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])

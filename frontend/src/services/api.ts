@@ -43,6 +43,14 @@ const shouldRetry = (
   return false;
 };
 
+const resolveTimeout = (method: string, path: string, timeoutMs?: number) => {
+  if (timeoutMs) return timeoutMs;
+  if (method === 'POST' && path === '/orders') {
+    return 70_000;
+  }
+  return API_TIMEOUT_MS;
+};
+
 const parseError = async (res: Response): Promise<ApiError> => {
   const fallback = 'Xatolik yuz berdi';
   let detail: string = fallback;
@@ -68,7 +76,7 @@ const executeRequest = async (
   for (let attempt = 0; attempt <= retries; attempt++) {
     const startedAt  = Date.now();
     const controller = new AbortController();
-    const timer      = setTimeout(() => controller.abort(), options.timeoutMs ?? API_TIMEOUT_MS);
+    const timer      = setTimeout(() => controller.abort(), resolveTimeout(method, path, options.timeoutMs));
 
     try {
       const token = await getAuthToken();

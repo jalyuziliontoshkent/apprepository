@@ -7,7 +7,7 @@ import { useAuthStore } from '../src/store/useAuthStore';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 import { useAppStore } from '../src/utils/store';
 import { useTheme } from '../src/utils/theme';
-import { api } from '../src/services/apiClient';
+import { api, warmBackend } from '../src/services/apiClient';
 
 export { api };
 
@@ -19,6 +19,10 @@ function AuthGuard() {
   useEffect(() => {
     void initialize();
   }, [initialize]);
+
+  useEffect(() => {
+    void warmBackend();
+  }, []);
 
   useEffect(() => {
     if (isLoading || !isHydrated) {

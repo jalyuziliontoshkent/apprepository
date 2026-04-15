@@ -1,7 +1,7 @@
 import { createApi } from './api';
 
-/** Production API (Railway). Telefon buildida .env dagi 192.168.* ishlatilmasin. */
-const FALLBACK_PRODUCTION = 'https://web-production-cabff.up.railway.app';
+/** Production API. Telefon buildida lokal URL ishlatilmasin. */
+const FALLBACK_PRODUCTION = 'https://lion-blinds-backend.onrender.com';
 
 function isLikelyLanOrLocalhost(url: string): boolean {
   try {
@@ -30,4 +30,20 @@ function resolveBackendUrl(): string {
   return raw;
 }
 
-export const api = createApi(resolveBackendUrl());
+export const backendUrl = resolveBackendUrl();
+export const api = createApi(backendUrl);
+
+let warmupPromise: Promise<void> | null = null;
+
+export const warmBackend = async (): Promise<void> => {
+  if (warmupPromise) return warmupPromise;
+
+  warmupPromise = fetch(`${backendUrl}/api/health`)
+    .then(() => undefined)
+    .catch(() => undefined)
+    .finally(() => {
+      warmupPromise = null;
+    });
+
+  return warmupPromise;
+};

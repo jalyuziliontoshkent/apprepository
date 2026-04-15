@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Package } from 'lucide-react-native';
 import { useTheme } from '../utils/theme';
 import { Button } from './Button';
-import { radius, spacing, typography } from '../theme/theme';
+import { radius, shadows, spacing, typography } from '../theme/theme';
 
 type StateViewProps = {
   title: string;
@@ -25,7 +25,7 @@ export function StateView({
   const c = useTheme();
 
   return (
-    <View style={[styles.card, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
+    <View style={[styles.card, shadows.md, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
       <View style={[styles.iconWrap, { backgroundColor: c.accentSoft }]}>
         {loading ? <ActivityIndicator color={c.accent} size="small" /> : icon ?? <Package size={24} color={c.accent} />}
       </View>

@@ -13,6 +13,11 @@ type OrderItem = {
   quantity: number; price_per_sqm: number;
 };
 
+const toBillableSqm = (area: number) => {
+  if (area <= 0) return 0;
+  return Math.ceil(area * 2 - 1e-9) / 2;
+};
+
 export default function NewOrder() {
   const c = useTheme();
   const s = useMemo(() => createStyles(c), [c]);
@@ -41,9 +46,12 @@ export default function NewOrder() {
 
   const getItemsForMaterial = (matId: string) => items.filter(it => it.material_id === matId);
   const getTotalForMaterial = (matId: string) =>
-    getItemsForMaterial(matId).reduce((sum, it) => sum + (parseFloat(it.width) * parseFloat(it.height) * it.quantity * it.price_per_sqm), 0);
+    getItemsForMaterial(matId).reduce((sum, it) => {
+      const billableSqm = toBillableSqm((parseFloat(it.width) || 0) * (parseFloat(it.height) || 0) * it.quantity);
+      return sum + (billableSqm * it.price_per_sqm);
+    }, 0);
 
-  const sqm = (parseFloat(width) || 0) * (parseFloat(height) || 0);
+  const sqm = toBillableSqm((parseFloat(width) || 0) * (parseFloat(height) || 0));
 
   const addItem = (mat: any) => {
     if (sqm <= 0) return;
@@ -54,8 +62,8 @@ export default function NewOrder() {
 
   const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
 
-  const totalSqm = items.reduce((s, it) => s + (parseFloat(it.width) * parseFloat(it.height) * it.quantity), 0);
-  const totalPrice = items.reduce((s, it) => s + (parseFloat(it.width) * parseFloat(it.height) * it.quantity * it.price_per_sqm), 0);
+  const totalSqm = items.reduce((s, it) => s + toBillableSqm((parseFloat(it.width) || 0) * (parseFloat(it.height) || 0) * it.quantity), 0);
+  const totalPrice = items.reduce((s, it) => s + (toBillableSqm((parseFloat(it.width) || 0) * (parseFloat(it.height) || 0) * it.quantity) * it.price_per_sqm), 0);
 
   const submitOrder = async () => {
     if (items.length === 0) return;
@@ -177,7 +185,7 @@ export default function NewOrder() {
                     {isExpanded && (
                       <View style={s.expanded}>
                         {matItems.length > 0 && matItems.map((it, idx) => {
-                          const itSqm = parseFloat(it.width) * parseFloat(it.height);
+                          const itSqm = toBillableSqm((parseFloat(it.width) || 0) * (parseFloat(it.height) || 0));
                           return (
                             <View key={idx} style={s.existItem}>
                               <View style={{ flex: 1 }}>
