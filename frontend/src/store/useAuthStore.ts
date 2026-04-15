@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import { clearAllCache } from '../services/cache';
 
 export interface User {
@@ -29,22 +28,46 @@ type AuthState = {
 
 const AUTH_TOKEN_KEY = 'token';
 const AUTH_USER_KEY = 'user';
+const SESSION_STORAGE_TIMEOUT_MS = 1500;
+
+const withTimeout = async <T>(operation: Promise<T>, fallback: T, timeoutMs = SESSION_STORAGE_TIMEOUT_MS) => {
+  try {
+    return await Promise.race<T>([
+      operation,
+      new Promise<T>((resolve) => {
+        setTimeout(() => resolve(fallback), timeoutMs);
+      }),
+    ]);
+  } catch {
+    return fallback;
+  }
+};
 
 const persistSessionSnapshot = async (user: User | null, token: string | null) => {
   if (!user || !token) {
-    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_USER_KEY]);
+    await withTimeout(AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_USER_KEY]), undefined);
     return;
   }
 
-  await AsyncStorage.multiSet([
-    [AUTH_TOKEN_KEY, token],
-    [AUTH_USER_KEY, JSON.stringify(user)],
-  ]);
+  await withTimeout(
+    AsyncStorage.multiSet([
+      [AUTH_TOKEN_KEY, token],
+      [AUTH_USER_KEY, JSON.stringify(user)],
+    ]),
+    undefined,
+  );
 };
 
 const getPersistedSessionSnapshot = async (): Promise<{ user: User; token: string } | null> => {
   try {
-    const [[, storedToken], [, storedUser]] = await AsyncStorage.multiGet([AUTH_TOKEN_KEY, AUTH_USER_KEY]);
+    const entries = await withTimeout(
+      AsyncStorage.multiGet([AUTH_TOKEN_KEY, AUTH_USER_KEY]),
+      [
+        [AUTH_TOKEN_KEY, null],
+        [AUTH_USER_KEY, null],
+      ] as [string, string | null][],
+    );
+    const [[, storedToken], [, storedUser]] = entries;
 
     if (!storedToken || !storedUser) {
       return null;
@@ -59,108 +82,95 @@ const getPersistedSessionSnapshot = async (): Promise<{ user: User; token: strin
   }
 };
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
+export const useAuthStore = create<AuthState>((set) => ({
+  user: null,
+  token: null,
+  isLoading: true,
+  isHydrated: false,
+
+  setUser: async (user, token) => {
+    await persistSessionSnapshot(user, token).catch(() => {});
+    set({
+      user,
+      token,
+      isLoading: false,
+      isHydrated: true,
+    });
+  },
+
+  clearSession: async () => {
+    await clearAllCache().catch(() => {});
+    await AsyncStorage.multiRemove([
+      AUTH_TOKEN_KEY,
+      AUTH_USER_KEY,
+      'auth-storage',
+      'sb-local-storage',
+    ]).catch(() => {});
+
+    set({
       user: null,
       token: null,
-      isLoading: true,
-      isHydrated: false,
+      isLoading: false,
+      isHydrated: true,
+    });
+  },
 
-      setUser: async (user, token) => {
-        await persistSessionSnapshot(user, token).catch(() => {});
-        set({
-          user,
-          token,
-          isLoading: false,
-          isHydrated: true,
-        });
-      },
+  initialize: async () => {
+    set({ isLoading: true });
 
-      clearSession: async () => {
-        await clearAllCache().catch(() => {});
-        await AsyncStorage.multiRemove([
-          AUTH_TOKEN_KEY,
-          AUTH_USER_KEY,
-          'auth-storage',
-          'sb-local-storage',
-        ]).catch(() => {});
+    const persistedSnapshot = await getPersistedSessionSnapshot();
+    if (persistedSnapshot) {
+      set({
+        user: persistedSnapshot.user,
+        token: persistedSnapshot.token,
+        isLoading: false,
+        isHydrated: true,
+      });
+      return;
+    }
 
-        set({
-          user: null,
-          token: null,
-          isLoading: false,
-          isHydrated: true,
-        });
-      },
+    set({
+      user: null,
+      token: null,
+      isLoading: false,
+      isHydrated: true,
+    });
+  },
 
-      initialize: async () => {
-        set({ isLoading: true });
+  checkSession: async () => {
+    const persistedSnapshot = await getPersistedSessionSnapshot();
+    if (persistedSnapshot) {
+      set({
+        user: persistedSnapshot.user,
+        token: persistedSnapshot.token,
+        isLoading: false,
+        isHydrated: true,
+      });
+      return;
+    }
 
-        const persistedSnapshot = await getPersistedSessionSnapshot();
-        if (persistedSnapshot) {
-          set({
-            user: persistedSnapshot.user,
-            token: persistedSnapshot.token,
-            isLoading: false,
-            isHydrated: true,
-          });
-          return;
-        }
+    set({
+      user: null,
+      token: null,
+      isLoading: false,
+      isHydrated: true,
+    });
+  },
 
-        set({
-          user: null,
-          token: null,
-          isLoading: false,
-          isHydrated: true,
-        });
-      },
+  logout: async () => {
+    await clearAllCache().catch(() => {});
+    await AsyncStorage.multiRemove([
+      AUTH_TOKEN_KEY,
+      AUTH_USER_KEY,
+      'auth-storage',
+      'sb-local-storage',
+    ]).catch(() => {});
 
-      checkSession: async () => {
-        const persistedSnapshot = await getPersistedSessionSnapshot();
-        if (persistedSnapshot) {
-          set({
-            user: persistedSnapshot.user,
-            token: persistedSnapshot.token,
-            isLoading: false,
-            isHydrated: true,
-          });
-          return;
-        }
-
-        set({
-          user: null,
-          token: null,
-          isLoading: false,
-          isHydrated: true,
-        });
-      },
-
-      logout: async () => {
-        await clearAllCache().catch(() => {});
-        await AsyncStorage.multiRemove([
-          AUTH_TOKEN_KEY,
-          AUTH_USER_KEY,
-          'auth-storage',
-          'sb-local-storage',
-        ]).catch(() => {});
-
-        set({
-          user: null,
-          token: null,
-          isLoading: false,
-          isHydrated: true,
-        });
-      },
-    }),
-    {
-      name: 'auth-storage',
-      storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({
-        user: state.user,
-        token: state.token,
-        isHydrated: state.isHydrated,
-      }),
-    },
-  ),
-);
+    set({
+      user: null,
+      token: null,
+      isLoading: false,
+      isHydrated: true,
+    });
+  },
+}));

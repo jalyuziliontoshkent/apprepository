@@ -52,7 +52,7 @@ export const Button = memo<ButtonProps>(({
           style,
         ]}
         disabled={isDisabled}
-        activeOpacity={0.82}
+        activeOpacity={0.9}
         accessibilityRole="button"
         accessibilityLabel={title}
         {...props}
@@ -61,8 +61,10 @@ export const Button = memo<ButtonProps>(({
           colors={[c.primary, c.secondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={[styles.inner, { height: h, borderRadius: radius.full }]}
-        >
+          style={[StyleSheet.absoluteFill, { borderRadius: radius.full }]}
+          pointerEvents="none"
+        />
+        <View style={[styles.inner, { height: h, borderRadius: radius.full }]}>
           {loading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
@@ -72,7 +74,7 @@ export const Button = memo<ButtonProps>(({
               {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
             </>
           )}
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
     );
   }

@@ -14,19 +14,23 @@ export function OfflineBanner() {
       const offlineNow = !connected || reachable === false;
       setOffline(offlineNow);
     });
+
     NetInfo.fetch().then((state) => {
       const connected = state.isConnected ?? true;
       const reachable = state.isInternetReachable;
       setOffline(!connected || reachable === false);
     });
+
     return () => unsub();
   }, []);
 
-  if (!offline) return null;
+  if (!offline) {
+    return null;
+  }
 
   return (
-    <View style={[styles.wrap, { top: insets.top }]} pointerEvents="none">
-      <Text style={styles.text}>Internet yo‘q — oxirgi saqlangan ma’lumotlar ko‘rsatiladi</Text>
+    <View style={[styles.wrap, styles.noPointerEvents, { top: insets.top }]}>
+      <Text style={styles.text}>Internet yo'q - oxirgi saqlangan ma'lumotlar ko'rsatiladi</Text>
     </View>
   );
 }
@@ -40,6 +44,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(180, 120, 0, 0.92)',
     paddingVertical: 8,
     paddingHorizontal: 14,
+  },
+  noPointerEvents: {
+    pointerEvents: 'none',
   },
   text: {
     color: '#111',

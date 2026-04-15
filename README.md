@@ -43,12 +43,12 @@ Qiymatlarni Blueprint formasida kiriting, keyin deploy davom etadi.
 
 ### 4-qadam: Tekshirish
 
-- Render servis sahifasida **URL** chiqadi: `https://lion-blinds-backend.onrender.com` (yoki siz tanlagan nom).
+- Railway servis sahifasida **URL** chiqadi: `https://web-production-cabff.up.railway.app` (yoki sizning Railway domeningiz).
 - Brauzerda oching: `https://<SIZNING-URL>/api/health` → muvaffaqiyatli javob kutiladi.
 
 ### 5-qadam: Mobil ilova
 
-Render dan chiqqan HTTPS URL ni `frontend/eas.json` ichidagi `EXPO_PUBLIC_BACKEND_URL` ga qo‘ying, keyin:
+Railway dan chiqqan HTTPS URL ni `frontend/eas.json` ichidagi `EXPO_PUBLIC_BACKEND_URL` ga qo‘ying, keyin:
 
 ```bash
 cd frontend

@@ -6,7 +6,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -23,6 +22,7 @@ import { useAppStore } from '../src/utils/store';
 import { typography, spacing, radius } from '../src/theme/theme';
 
 export default function LoginScreen() {
+  const isWeb = Platform.OS === 'web';
   const router   = useRouter();
   const c        = useTheme();
   const theme    = useAppStore((s) => s.theme);
@@ -33,38 +33,54 @@ export default function LoginScreen() {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
 
+  const navigateAfterLogin = useCallback((role: 'admin' | 'worker' | 'dealer') => {
+    const destination =
+      role === 'admin'
+        ? '/admin/dashboard'
+        : role === 'worker'
+          ? '/worker/tasks'
+          : '/dealer/dashboard';
+
+    if (typeof window !== 'undefined') {
+      window.location.replace(destination);
+      return;
+    }
+
+    router.replace(destination as any);
+  }, [router]);
+
   // Animated shake for error
   const shakeAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const fadeAnim  = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
 
   useEffect(() => {
+    if (isWeb) {
+      return;
+    }
+
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 500,
       useNativeDriver: true,
     }).start();
-  }, [fadeAnim]);
+  }, [fadeAnim, isWeb]);
 
   // Redirect once auth state is resolved
   useEffect(() => {
     if (isLoading || !user || !token) return;
-    const dest =
-      user.role === 'admin'  ? '/(admin)/dashboard'  :
-      user.role === 'worker' ? '/(worker)/tasks'      :
-                               '/(dealer)/dashboard';
-    router.replace(dest as any);
-  }, [user, token, isLoading, router]);
+    navigateAfterLogin(user.role);
+  }, [user, token, isLoading, navigateAfterLogin]);
 
   const triggerShake = useCallback(() => {
     shakeAnim.setValue(0);
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10,  duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 8,  duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0,  duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 10,  duration: 60, useNativeDriver: !isWeb }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: !isWeb }),
+      Animated.timing(shakeAnim, { toValue: 8,  duration: 60, useNativeDriver: !isWeb }),
+      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: !isWeb }),
+      Animated.timing(shakeAnim, { toValue: 0,  duration: 60, useNativeDriver: !isWeb }),
     ]).start();
-  }, [shakeAnim]);
+  }, [isWeb, shakeAnim]);
 
   const handleLogin = useCallback(async () => {
     const trimmedEmail    = email.trim().toLowerCase();
@@ -83,10 +99,15 @@ export default function LoginScreen() {
 
     setLoading(true);
     setError('');
+
+    console.log('[Login] Attempting login for:', trimmedEmail);
+
     try {
-      await AuthService.login(trimmedEmail, trimmedPassword);
-      // Redirect handled by useEffect above
+      const loggedInUser = await AuthService.login(trimmedEmail, trimmedPassword);
+      console.log('[Login] Success, user role:', loggedInUser.role);
+      navigateAfterLogin(loggedInUser.role);
     } catch (e: any) {
+      console.error('[Login] Error:', e);
       const msg =
         e?.message === 'Invalid login credentials' || e?.message === "Email yoki parol noto'g'ri"
           ? 'Email yoki parol noto\'g\'ri.'
@@ -96,14 +117,15 @@ export default function LoginScreen() {
     } finally {
       setLoading(false);
     }
-  }, [email, password, triggerShake]);
+  }, [email, navigateAfterLogin, password, triggerShake]);
 
-  // Show spinner only during initial session restoration
+  // Show spinner during initial session restoration
   if (isLoading) {
     return (
-      <View style={[s.splash, { backgroundColor: c.bg }]}>
-        <ActivityIndicator size="large" color={c.primary} />
-      </View>
+      <SafeAreaView style={[s.root, { backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' }]}>
+        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+        <Text style={{ color: c.textSec }}>Yuklanmoqda...</Text>
+      </SafeAreaView>
     );
   }
 
@@ -112,7 +134,7 @@ export default function LoginScreen() {
       <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
 
       {/* Background gradient accent */}
-      <View style={s.bgAccent} pointerEvents="none">
+      <View style={[s.bgAccent, s.noPointerEvents]}>
         <LinearGradient
           colors={['rgba(108,99,255,0.18)', 'transparent']}
           style={s.bgGrad}
@@ -204,6 +226,9 @@ const s = StyleSheet.create({
   bgAccent: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
   bgGrad:   { width: '100%', height: 400, borderRadius: 300, transform: [{ translateY: -200 }] },
   content:  { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl },
+  noPointerEvents: {
+    pointerEvents: 'none',
+  },
 
   brand: {
     alignItems: 'center',
