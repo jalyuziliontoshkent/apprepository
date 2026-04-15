@@ -108,10 +108,16 @@ export default function LoginScreen() {
       navigateAfterLogin(loggedInUser.role);
     } catch (e: any) {
       console.error('[Login] Error:', e);
-      const msg =
-        e?.message === 'Invalid login credentials' || e?.message === "Email yoki parol noto'g'ri"
-          ? 'Email yoki parol noto\'g\'ri.'
-          : e?.message || 'Xatolik yuz berdi. Qayta urinib ko\'ring.';
+      let msg = 'Xatolik yuz berdi. Qayta urinib ko\'ring.';
+      
+      if (e?.message === 'Invalid login credentials' || e?.message === "Email yoki parol noto'g'ri") {
+        msg = 'Email yoki parol noto\'g\'ri.';
+      } else if (e?.code === 'NETWORK' || e?.message?.includes('Backend URL')) {
+        msg = 'Serverga ulanishda xatolik. Iltimos, internet ulanishingizni tekshiring.';
+      } else if (e?.message) {
+        msg = e.message;
+      }
+      
       setError(msg);
       triggerShake();
     } finally {

@@ -47,26 +47,22 @@ function getEnvBackendUrl(): string | undefined {
 function resolveBackendUrl(): string {
   const raw = getEnvBackendUrl();
 
-  // If no env var set, use production fallback
-  if (!raw) {
-    console.log('[API] No EXPO_PUBLIC_BACKEND_URL found, using fallback:', FALLBACK_PRODUCTION);
+  // HARDcoded production URL for APK builds
+  // process.env is unreliable in production builds, so always use fallback for production
+  if (typeof __DEV__ === 'undefined' || !__DEV__) {
+    console.log('[API] Production mode, using hardcoded fallback:', FALLBACK_PRODUCTION);
     return FALLBACK_PRODUCTION;
   }
 
-  // In development, always use the provided URL
-  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  // Development mode - try env var first
+  if (raw) {
     console.log('[API] Development mode, using:', raw);
     return raw;
   }
 
-  // In production, don't use local/LAN addresses
-  if (isLikelyLanOrLocalhost(raw)) {
-    console.log('[API] Local URL detected in production, using fallback:', FALLBACK_PRODUCTION);
-    return FALLBACK_PRODUCTION;
-  }
-
-  console.log('[API] Using backend URL:', raw);
-  return raw;
+  // Development fallback
+  console.log('[API] Development: No env var, using fallback:', FALLBACK_PRODUCTION);
+  return FALLBACK_PRODUCTION;
 }
 
 export const backendUrl = resolveBackendUrl();
