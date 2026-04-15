@@ -24,7 +24,7 @@ function isLikelyLanOrLocalhost(url: string): boolean {
 
 function getEnvBackendUrl(): string | undefined {
   // Try multiple sources for the backend URL
-  // 1. process.env (for Metro bundler)
+  // 1. process.env (for Metro bundler) - primary source for React Native
   try {
     const envVar = typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_BACKEND_URL : undefined;
     const env1 = typeof envVar === 'string' ? envVar.trim() : undefined;
@@ -38,12 +38,8 @@ function getEnvBackendUrl(): string | undefined {
     if (env2) return env2;
   } catch { /* ignore */ }
 
-  // 3. import.meta.env (for modern bundlers)
-  try {
-    const importEnv = (typeof import.meta !== 'undefined' && (import.meta as any).env?.EXPO_PUBLIC_BACKEND_URL);
-    const env3 = typeof importEnv === 'string' ? importEnv.trim() : undefined;
-    if (env3) return env3;
-  } catch { /* ignore */ }
+  // Note: import.meta.env is not used because it's not supported in Hermes (Android)
+  // The fallback URL will be used if no env var is found
 
   return undefined;
 }
