@@ -43,9 +43,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
           <RefreshCw size={18} color="#fff" style={{ marginRight: 8 }} />
           <Text style={s.btnText}>Qayta ochish</Text>
         </TouchableOpacity>
-        {__DEV__ && this.state.error && (
+        {this.state.error && (
           <Text style={[s.debug, { color: c.danger }]} selectable>
             {this.state.error.message}
+            {this.state.error.stack ? '\n\n' + this.state.error.stack.substring(0, 200) : ''}
           </Text>
         )}
       </View>
