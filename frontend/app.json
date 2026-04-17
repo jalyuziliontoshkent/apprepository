@@ -67,6 +67,11 @@
       "router": {},
       "eas": {
         "projectId": "1f68b97f-5978-44d4-9a81-82cc12d9b93e"
+      },
+      "developer": {
+        "name": "Lion Blinds Team",
+        "email": "support@lionblinds.uz",
+        "website": "https://lionblinds.uz"
       }
     }
   }
