@@ -7,7 +7,6 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "prebuildCommand": "chmod -R 644 . && chmod -R +X . || true",
       "distribution": "internal",
       "environment": "development",
       "env": {
@@ -22,7 +21,6 @@
     },
     "preview": {
       "distribution": "internal",
-      "prebuildCommand": "chmod -R 644 . && chmod -R +X . || true",
       "environment": "preview",
       "env": {
         "EAS_BUILD_NO_EXPO_GO_WARNING": "true",
@@ -39,12 +37,10 @@
     },
     "production": {
       "extends": "preview",
-      "prebuildCommand": "chmod -R 644 . && chmod -R +X . || true",
       "autoIncrement": true
     },
     "playstore": {
       "distribution": "store",
-      "prebuildCommand": "chmod -R 644 . && chmod -R +X . || true",
       "environment": "production",
       "autoIncrement": true,
       "env": {
