@@ -2169,7 +2169,7 @@ async def startup():
     pool = await asyncpg.create_pool(DATABASE_URL, **asyncpg_pool_kwargs())
     async with pool.acquire() as conn:
         await create_tables(conn)
-        await create_indexes(conn)
+        # await create_indexes(conn)
         await seed_admin(conn)
     asyncio.create_task(keep_alive_task())
     logger.info("Muvaffaqiyat: API tayyor, PostgreSQL ulandi, keep-alive yoqildi (bu xato emas).")
