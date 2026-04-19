@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CheckCircle, Ruler } from 'lucide-react-native';
 import { api } from '../../src/services/apiClient';
 import { SectionCard } from '../../src/components/SectionCard';
@@ -44,6 +45,10 @@ export default function WorkerCompleted() {
 
   return (
     <SafeAreaView style={s.container}>
+      <View style={s.backgroundAccent} pointerEvents="none">
+        <LinearGradient colors={['rgba(108,99,255,0.16)', 'transparent']} style={s.backgroundGlowPrimary} />
+        <LinearGradient colors={['rgba(34,198,122,0.10)', 'transparent']} style={s.backgroundGlowSecondary} />
+      </View>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
@@ -88,6 +93,26 @@ export default function WorkerCompleted() {
 
 const createStyles = (c: ReturnType<typeof useTheme>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
+  backgroundAccent: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  backgroundGlowPrimary: {
+    position: 'absolute',
+    top: -120,
+    left: -90,
+    width: 320,
+    height: 320,
+    borderRadius: 320,
+  },
+  backgroundGlowSecondary: {
+    position: 'absolute',
+    right: -110,
+    top: 220,
+    width: 260,
+    height: 260,
+    borderRadius: 260,
+  },
   centered: { flex: 1, paddingHorizontal: 22, justifyContent: 'center' },
   scroll: { paddingHorizontal: 22, paddingTop: 16, paddingBottom: 108, gap: 14 },
   hero: { padding: 22 },
@@ -104,7 +129,7 @@ const createStyles = (c: ReturnType<typeof useTheme>) => StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     borderColor: c.cardBorder,
-    backgroundColor: c.inputBg,
+    backgroundColor: '#11141C',
     padding: 16,
     marginBottom: 12,
   },
@@ -114,8 +139,16 @@ const createStyles = (c: ReturnType<typeof useTheme>) => StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  taskCode: { fontSize: 13, fontWeight: '900', color: c.text, letterSpacing: 1 },
-  doneBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  taskCode: { fontSize: 13, fontWeight: '900', color: c.accent, letterSpacing: 1.4 },
+  doneBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: c.successSoft,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
   doneText: { fontSize: 12, fontWeight: '800', color: c.success },
   taskMaterial: { fontSize: 18, fontWeight: '800', color: c.text, marginTop: 12 },
   taskInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },

@@ -261,12 +261,12 @@ export default function DealersScreen() {
 const s = StyleSheet.create({
   c: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
-  title: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
+  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
   subtitle: { fontSize: 12, marginTop: 2 },
   addBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   scroll: { paddingHorizontal: 16, paddingTop: 8 },
 
-  card: { borderRadius: 20, marginBottom: 12, borderWidth: 1, overflow: 'hidden' },
+  card: { borderRadius: 22, marginBottom: 12, borderWidth: 1, overflow: 'hidden' },
   cardTop: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
   avatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 20, fontWeight: '800' },

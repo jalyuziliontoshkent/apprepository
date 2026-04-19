@@ -164,7 +164,7 @@ export default function NewOrder() {
                         </View>
                       </View>
                       <TouchableOpacity style={[s.expandBtn, isExpanded && s.expandBtnActive]} onPress={() => toggleExpand(mat.id)}>
-                        {isExpanded ? <X size={18} color="#000" /> : <Plus size={18} color="rgba(255,255,255,0.5)" />}
+                        {isExpanded ? <X size={18} color="#fff" /> : <Plus size={18} color="rgba(255,255,255,0.5)" />}
                       </TouchableOpacity>
                     </TouchableOpacity>
 
@@ -209,7 +209,7 @@ export default function NewOrder() {
                             <TextInput style={s.dimInput} value={height} onChangeText={setHeight} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor="rgba(255,255,255,0.12)" />
                           </View>
                           <TouchableOpacity style={[s.addBtn, sqm <= 0 && s.addBtnOff]} onPress={() => addItem(mat)} disabled={sqm <= 0}>
-                            <Plus size={18} color={sqm > 0 ? '#000' : 'rgba(255,255,255,0.15)'} />
+                            <Plus size={18} color={sqm > 0 ? '#fff' : 'rgba(255,255,255,0.15)'} />
                           </TouchableOpacity>
                         </View>
                         {currentSqm > 0 && (
@@ -244,7 +244,7 @@ export default function NewOrder() {
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.submitBtn, submitting && { opacity: 0.6 }]} onPress={submitOrder} disabled={submitting}>
                   {submitting ? <ActivityIndicator color="#000" size="small" /> : (
-                    <><Send size={14} color="#000" /><Text style={s.submitText}>Yuborish</Text></>
+                    <><Send size={14} color="#fff" /><Text style={s.submitText}>Yuborish</Text></>
                   )}
                 </TouchableOpacity>
               </View>
@@ -259,65 +259,65 @@ export default function NewOrder() {
 const createStyles = (c: any) => StyleSheet.create({
   c: { flex: 1, backgroundColor: c.bg },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
-  title: { fontSize: 24, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
-  subtitle: { fontSize: 13, color: 'rgba(255,255,255,0.35)', marginTop: 2 },
+  title: { fontSize: 26, fontWeight: '800', color: c.text, letterSpacing: -0.5 },
+  subtitle: { fontSize: 13, color: c.textTer, marginTop: 2 },
   countBadge: { width: 36, height: 36, borderRadius: 18, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' },
   countText: { fontSize: 15, fontWeight: '800', color: '#fff' },
   successBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 20, marginBottom: 8, paddingVertical: 14, backgroundColor: 'rgba(0,200,83,0.08)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(0,200,83,0.15)' },
   successText: { color: '#00C853', fontSize: 15, fontWeight: '700' },
   // Categories grid
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, paddingTop: 16, gap: 10 },
-  catCard: { width: '47%', flexGrow: 1, backgroundColor: c.card, borderRadius: 20, padding: 20, alignItems: 'center', borderWidth: 1, borderColor: c.cardBorder, gap: 8 },
+  catCard: { width: '47%', flexGrow: 1, backgroundColor: '#0E1015', borderRadius: 20, padding: 20, alignItems: 'center', borderWidth: 1, borderColor: c.cardBorder, gap: 8 },
   catIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center' },
-  catCardName: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  catCardCount: { fontSize: 12, color: 'rgba(255,255,255,0.35)' },
+  catCardName: { fontSize: 16, fontWeight: '700', color: c.text },
+  catCardCount: { fontSize: 12, color: c.textTer },
   // Back button
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 20, paddingVertical: 8 },
   backText: { fontSize: 14, color: c.accent, fontWeight: '600' },
   // Materials list
   listContent: { paddingHorizontal: 16 },
-  matCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', marginBottom: 10, overflow: 'hidden' },
+  matCard: { backgroundColor: '#0E1015', borderRadius: 20, borderWidth: 1, borderColor: c.cardBorder, marginBottom: 10, overflow: 'hidden' },
   matCardExpanded: { borderColor: 'rgba(108,99,255,0.3)', backgroundColor: 'rgba(108,99,255,0.04)' },
   matCardWithItems: { borderColor: 'rgba(0,230,118,0.15)' },
   matRow: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12 },
   matImg: { width: 50, height: 50, borderRadius: 14, backgroundColor: '#111' },
   matImgEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.03)' },
   matInfo: { flex: 1 },
-  matName: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  matName: { fontSize: 15, fontWeight: '700', color: c.text },
   matMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
-  matPrice: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.6)' },
-  matPriceUnit: { fontSize: 11, color: 'rgba(255,255,255,0.3)' },
+  matPrice: { fontSize: 14, fontWeight: '600', color: c.textSec },
+  matPriceUnit: { fontSize: 11, color: c.textTer },
   matBadge: { backgroundColor: 'rgba(0,230,118,0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   matBadgeText: { fontSize: 11, fontWeight: '700', color: c.success },
-  expandBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
-  expandBtnActive: { backgroundColor: '#fff' },
+  expandBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: c.inputBg, alignItems: 'center', justifyContent: 'center' },
+  expandBtnActive: { backgroundColor: c.accent },
   chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 12, gap: 6 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,230,118,0.08)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(0,230,118,0.12)' },
-  chipText: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.7)' },
+  chipText: { fontSize: 12, fontWeight: '600', color: c.textSec },
   chipsTotal: { fontSize: 13, fontWeight: '700', color: c.success, marginLeft: 4 },
   expanded: { paddingHorizontal: 12, paddingBottom: 14 },
-  existItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 10, marginBottom: 6 },
-  existSize: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  existCalc: { fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
+  existItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#11141C', borderRadius: 12, padding: 10, marginBottom: 6 },
+  existSize: { fontSize: 14, fontWeight: '600', color: c.text },
+  existCalc: { fontSize: 11, color: c.textTer, marginTop: 2 },
   existDel: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,82,82,0.1)', alignItems: 'center', justifyContent: 'center' },
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   inputWrap: { flex: 1 },
-  inputLabel: { fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, fontWeight: '600' },
-  dimInput: { height: 48, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 14, fontSize: 20, color: '#fff', textAlign: 'center', fontWeight: '300' },
-  x: { fontSize: 18, color: 'rgba(255,255,255,0.12)', paddingBottom: 12 },
-  addBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  inputLabel: { fontSize: 9, color: c.textTer, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, fontWeight: '600' },
+  dimInput: { height: 48, backgroundColor: c.inputBg, borderRadius: 14, borderWidth: 1, borderColor: c.inputBorder, paddingHorizontal: 14, fontSize: 20, color: c.text, textAlign: 'center', fontWeight: '300' },
+  x: { fontSize: 18, color: c.textTer, paddingBottom: 12 },
+  addBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' },
   addBtnOff: { backgroundColor: 'rgba(255,255,255,0.06)' },
   liveCalc: { marginTop: 8, alignItems: 'center' },
   liveCalcText: { fontSize: 13, color: c.accent, fontWeight: '600' },
   // Bottom
-  bottom: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#0a0a0f', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingBottom: Platform.OS === 'ios' ? 28 : 16 },
+  bottom: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#0C0E14', borderTopWidth: 1, borderTopColor: c.cardBorder, paddingBottom: Platform.OS === 'ios' ? 28 : 16 },
   notesWrap: { paddingHorizontal: 16, paddingTop: 12 },
-  notesInput: { minHeight: 40, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, color: '#fff' },
+  notesInput: { minHeight: 40, backgroundColor: c.inputBg, borderRadius: 14, borderWidth: 1, borderColor: c.inputBorder, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, color: c.text },
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14 },
-  bottomLabel: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: '500' },
-  bottomTotal: { fontSize: 24, fontWeight: '800', color: '#fff', marginTop: 2 },
+  bottomLabel: { fontSize: 12, color: c.textTer, fontWeight: '500' },
+  bottomTotal: { fontSize: 24, fontWeight: '800', color: c.text, marginTop: 2 },
   bottomBtns: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  noteBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
-  submitBtn: { height: 48, paddingHorizontal: 24, backgroundColor: '#fff', borderRadius: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  submitText: { fontSize: 15, fontWeight: '800', color: '#000' },
+  noteBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: c.inputBg, alignItems: 'center', justifyContent: 'center' },
+  submitBtn: { height: 48, paddingHorizontal: 24, backgroundColor: c.accent, borderRadius: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  submitText: { fontSize: 15, fontWeight: '800', color: '#fff' },
 });

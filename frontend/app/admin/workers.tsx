@@ -121,14 +121,14 @@ export default function AdminWorkers() {
 }
 
 const s = StyleSheet.create({
-  c: { flex: 1 }, title: { fontSize: 26, fontWeight: '800', paddingHorizontal: 24, paddingTop: 16, letterSpacing: -0.5 },
-  tabs: { flexDirection: 'row', paddingHorizontal: 24, marginTop: 16, gap: 10 },
+  c: { flex: 1 }, title: { fontSize: 28, fontWeight: '800', paddingHorizontal: 20, paddingTop: 14, letterSpacing: -0.5 },
+  tabs: { flexDirection: 'row', paddingHorizontal: 20, marginTop: 14, gap: 10 },
   tabBtn: { flex: 1, height: 44, borderRadius: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1 },
   tabBadge: { backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  scroll: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 100 },
+  scroll: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 100 },
   addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 48, borderRadius: 24, marginBottom: 16 },
   addBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  card: { borderRadius: 20, borderWidth: 1, padding: 16, marginBottom: 10 },
+  card: { borderRadius: 22, borderWidth: 1, padding: 16, marginBottom: 10 },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   delBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

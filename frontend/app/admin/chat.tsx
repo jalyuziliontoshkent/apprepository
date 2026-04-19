@@ -68,7 +68,7 @@ export default function AdminChat() {
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
-        <ActivityIndicator size="large" color="#fff" style={{ flex: 1 }} />
+        <ActivityIndicator size="large" color={c.accent} style={{ flex: 1 }} />
       </SafeAreaView>
     );
   }
@@ -78,7 +78,7 @@ export default function AdminChat() {
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.chatHeader}>
           <TouchableOpacity testID="chat-back-btn" onPress={() => { setSelectedPartner(null); clearInterval(intervalRef.current); fetchPartners(); }} style={styles.backBtn}>
-            <ArrowLeft size={22} color="#fff" />
+            <ArrowLeft size={22} color={c.text} />
           </TouchableOpacity>
           <View style={styles.chatAvatar}>
             <Text style={styles.chatAvatarText}>{selectedPartner.name?.charAt(0)?.toUpperCase()}</Text>
@@ -127,7 +127,7 @@ export default function AdminChat() {
               multiline
             />
             <TouchableOpacity testID="chat-send-btn" style={styles.sendBtn} onPress={sendMessage}>
-              <Send size={20} color="#000" />
+              <Send size={20} color="#fff" />
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -179,75 +179,76 @@ export default function AdminChat() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  title: { fontSize: 24, fontWeight: '300', color: '#fff', paddingHorizontal: 24, paddingTop: 16, letterSpacing: -0.5 },
+  container: { flex: 1, backgroundColor: '#050608' },
+  title: { fontSize: 28, fontWeight: '800', color: '#F6F7FF', paddingHorizontal: 20, paddingTop: 16, letterSpacing: -0.5 },
   partnerList: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 100 },
   emptyState: { alignItems: 'center', paddingTop: 80 },
-  emptyText: { fontSize: 16, color: 'rgba(255,255,255,0.3)' },
+  emptyText: { fontSize: 16, color: '#5E6583' },
   partnerCard: {
     flexDirection: 'row', alignItems: 'center', padding: 16,
-    backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)', marginBottom: 8, gap: 14,
+    backgroundColor: '#0E1015', borderRadius: 20, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)', marginBottom: 8, gap: 14,
   },
   partnerAvatar: {
-    width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(108,99,255,0.16)',
     alignItems: 'center', justifyContent: 'center',
   },
-  partnerAvatarText: { fontSize: 20, fontWeight: '600', color: '#fff' },
+  partnerAvatarText: { fontSize: 20, fontWeight: '700', color: '#6C63FF' },
   partnerInfo: { flex: 1 },
-  partnerName: { fontSize: 16, fontWeight: '500', color: '#fff' },
-  partnerLastMsg: { fontSize: 13, color: 'rgba(255,255,255,0.35)', marginTop: 2 },
+  partnerName: { fontSize: 16, fontWeight: '700', color: '#F6F7FF' },
+  partnerLastMsg: { fontSize: 13, color: '#949AB7', marginTop: 2 },
   partnerMeta: { alignItems: 'flex-end', gap: 6 },
-  partnerTime: { fontSize: 11, color: 'rgba(255,255,255,0.3)' },
+  partnerTime: { fontSize: 11, color: '#5E6583' },
   unreadBadge: {
-    minWidth: 22, height: 22, borderRadius: 11, backgroundColor: '#fff',
+    minWidth: 22, height: 22, borderRadius: 11, backgroundColor: '#6C63FF',
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
   },
-  unreadText: { fontSize: 12, fontWeight: '700', color: '#000' },
+  unreadText: { fontSize: 12, fontWeight: '700', color: '#fff' },
   chatHeader: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)', gap: 12,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)', gap: 12,
+    backgroundColor: '#0C0E14',
   },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   chatAvatar: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(108,99,255,0.16)',
     alignItems: 'center', justifyContent: 'center',
   },
-  chatAvatarText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  chatAvatarText: { fontSize: 16, fontWeight: '700', color: '#6C63FF' },
   chatHeaderInfo: {},
-  chatHeaderName: { fontSize: 16, fontWeight: '500', color: '#fff' },
-  chatHeaderSub: { fontSize: 12, color: 'rgba(255,255,255,0.4)' },
+  chatHeaderName: { fontSize: 16, fontWeight: '700', color: '#F6F7FF' },
+  chatHeaderSub: { fontSize: 12, color: '#949AB7' },
   messagesArea: { flex: 1 },
   messagesContent: { padding: 16, gap: 8 },
   emptyChat: { alignItems: 'center', paddingTop: 80 },
-  emptyChatText: { fontSize: 16, color: 'rgba(255,255,255,0.3)' },
-  emptyChatSub: { fontSize: 13, color: 'rgba(255,255,255,0.2)', marginTop: 4 },
+  emptyChatText: { fontSize: 16, color: '#5E6583' },
+  emptyChatSub: { fontSize: 13, color: '#5E6583', marginTop: 4 },
   bubble: { maxWidth: '80%', borderRadius: 20, padding: 12, paddingBottom: 6 },
   bubbleSent: {
-    alignSelf: 'flex-end', backgroundColor: '#fff', borderBottomRightRadius: 4,
+    alignSelf: 'flex-end', backgroundColor: '#6C63FF', borderBottomRightRadius: 4,
   },
   bubbleReceived: {
-    alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderBottomLeftRadius: 4,
+    alignSelf: 'flex-start', backgroundColor: '#11141C',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderBottomLeftRadius: 4,
   },
   bubbleText: { fontSize: 15, lineHeight: 20 },
-  bubbleTextSent: { color: '#000' },
-  bubbleTextReceived: { color: '#fff' },
+  bubbleTextSent: { color: '#fff' },
+  bubbleTextReceived: { color: '#F6F7FF' },
   bubbleTime: { fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
-  bubbleTimeSent: { color: 'rgba(0,0,0,0.4)' },
-  bubbleTimeReceived: { color: 'rgba(255,255,255,0.3)' },
+  bubbleTimeSent: { color: 'rgba(255,255,255,0.72)' },
+  bubbleTimeReceived: { color: '#5E6583' },
   inputArea: {
     flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, paddingVertical: 12,
-    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', gap: 10,
-    backgroundColor: 'rgba(5,5,5,0.9)',
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', gap: 10,
+    backgroundColor: '#0C0E14',
   },
   chatInput: {
-    flex: 1, minHeight: 44, maxHeight: 100, backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 18, paddingVertical: 10, fontSize: 15, color: '#fff',
+    flex: 1, minHeight: 44, maxHeight: 100, backgroundColor: '#11141C',
+    borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 18, paddingVertical: 10, fontSize: 15, color: '#F6F7FF',
   },
   sendBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#6C63FF',
     alignItems: 'center', justifyContent: 'center',
   },
 });
