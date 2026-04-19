@@ -809,9 +809,14 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(401, "Not authenticated")
     try:
         p = jwt.decode(auth[7:], get_jwt_secret(), algorithms=[JWT_ALGORITHM])
-        user_id = p.get("sub")
-        if not user_id:
+        user_id_str = p.get("sub")
+        if not user_id_str:
             raise HTTPException(401, "Invalid token format - please login again")
+            
+        try:
+            user_id = int(user_id_str)
+        except ValueError:
+            user_id = user_id_str
             
         cache_key = f"user_auth_{user_id}"
         cached_user = cache.get(cache_key)
