@@ -203,6 +203,24 @@ def parse_json_field(value, default=None):
     return value
 
 
+def safe_float(value, default: float = 0.0) -> float:
+    try:
+        if value in (None, ""):
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def safe_int(value, default: int = 0) -> int:
+    try:
+        if value in (None, ""):
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 async def table_exists(db, table_name: str) -> bool:
     cached = schema_cache["tables"].get(table_name)
     if cached is not None:
@@ -288,11 +306,23 @@ def build_insert_statement(table_name: str, values: dict) -> tuple[str, list]:
     return sql, [values[column] for column in columns]
 
 
+async def normalize_datetime_for_db(db, table_name: str, field: str, value):
+    if isinstance(value, str) and field in {"created_at", "updated_at", "deleted_at"}:
+        udt = await column_udt_name(db, table_name, field)
+        if udt in {"timestamp", "timestamptz"}:
+            if "T" in value or "-" in value:
+                try:
+                    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+                except ValueError:
+                    pass
+    return value
+
+
 async def filter_existing_fields(db, table_name: str, values: dict) -> dict:
     result = {}
     for field, value in values.items():
         if await column_exists(db, table_name, field):
-            result[field] = value
+            result[field] = await normalize_datetime_for_db(db, table_name, field, value)
     return result
 
 
@@ -373,6 +403,57 @@ async def get_people_table(db) -> Optional[str]:
     return None
 
 
+async def temporal_value_for_column(db, table_name: str, column_name: str, value: Optional[datetime] = None):
+    current = value or datetime.now(timezone.utc)
+    udt_name = await column_udt_name(db, table_name, column_name)
+    if udt_name in {"timestamp", "timestamptz"}:
+        return current
+    if udt_name == "date":
+        return current.date()
+    return current.isoformat()
+
+
+async def order_items_order_clause(db) -> str:
+    order_parts: List[str] = []
+    if await column_exists(db, "order_items", "item_index"):
+        order_parts.append("COALESCE(item_index, 0) ASC")
+    if await column_exists(db, "order_items", "created_at"):
+        order_parts.append("created_at ASC")
+    if not order_parts:
+        order_parts.append("id ASC")
+    return ", ".join(order_parts)
+
+
+async def fetch_order_item_rows_for_orders(db, order_ids: List[str]):
+    if not order_ids or not await table_exists(db, "order_items"):
+        return []
+    order_by = await order_items_order_clause(db)
+    return await db.fetch(
+        f"""
+        SELECT *
+        FROM order_items
+        WHERE order_id::text = ANY($1::text[])
+        ORDER BY order_id::text ASC, {order_by}
+        """,
+        order_ids,
+    )
+
+
+async def fetch_order_item_rows_for_order(db, order_id: str):
+    if not await table_exists(db, "order_items"):
+        return []
+    order_by = await order_items_order_clause(db)
+    return await db.fetch(
+        f"""
+        SELECT *
+        FROM order_items
+        WHERE order_id::text = $1
+        ORDER BY {order_by}
+        """,
+        str(order_id),
+    )
+
+
 async def normalize_status_for_db(db, desired_status: str) -> str:
     allowed = await enum_values_for_column(db, "orders", "status")
     if not allowed or desired_status in allowed:
@@ -402,6 +483,7 @@ async def update_order_fields(conn, order_id: str, values: dict) -> None:
     idx = 1
     for field, value in values.items():
         if await column_exists(conn, "orders", field):
+            value = await normalize_datetime_for_db(conn, "orders", field, value)
             updates.append(f"{field} = ${idx}")
             params.append(value)
             idx += 1
@@ -717,12 +799,71 @@ class MaterialUpdate(BaseModel): name: Optional[str] = None; category: Optional[
 class CategoryCreate(BaseModel): name: str; description: str = ""; image_url: str = ""
 class CategoryUpdate(BaseModel): name: Optional[str] = None; description: Optional[str] = None; image_url: Optional[str] = None
 class OrderItemCreate(BaseModel): material_id: str; material_name: str; width: float; height: float; quantity: int = 1; price_per_sqm: float; notes: str = ""
+
+async def get_current_user(request: Request) -> dict:
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "): 
+        logger.error("Auth error: Missing or invalid Authorization header")
+        raise HTTPException(401, "Not authenticated")
+    try:
+        p = jwt.decode(auth[7:], get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        user_id = p.get("sub")
+        if not user_id:
+            raise HTTPException(401, "Invalid token format - please login again")
+            
+        cache_key = f"user_auth_{user_id}"
+        cached_user = cache.get(cache_key)
+        if cached_user:
+            return cached_user
+            
+        db = await get_pool()
+        row = await db.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
+        if not row: raise HTTPException(401, "User not found")
+        user = row_to_dict(row)
+        user["id"] = str(user["id"])
+        user.pop("password_hash", None)
+        
+        cache.set(cache_key, user, 60) # 1 minut xotirada saqlash
+        return user
+    except jwt.ExpiredSignatureError: 
+        logger.error("Auth error: Token expired")
+        raise HTTPException(401, "Token expired")
+    except jwt.InvalidTokenError as e: 
+        logger.error(f"Auth error: Invalid token {e}")
+        raise HTTPException(401, "Invalid token")
+    except HTTPException: raise
+    except Exception as e:
+        logger.error(f"Auth error (other): {e}")
+        raise HTTPException(401, "Authentication failed")
+
+async def require_admin(request: Request) -> dict:
+    u = await get_current_user(request)
+    if u.get("role") != "admin": raise HTTPException(403, "Admin only")
+    return u
+
+async def require_worker(request: Request) -> dict:
+    u = await get_current_user(request)
+    if u.get("role") != "worker": raise HTTPException(403, "Worker only")
+    return u
+
+# ─── Pydantic Models ───
+class LoginReq(BaseModel): email: str; password: str
+class DealerCreate(BaseModel): name: str; email: str; password: str; phone: str = ""; address: str = ""; credit_limit: float = 0
+class DealerUpdate(BaseModel): name: Optional[str] = None; phone: Optional[str] = None; address: Optional[str] = None; credit_limit: Optional[float] = None
+class WorkerCreate(BaseModel): name: str; email: str; password: str; phone: str = ""; specialty: str = ""
+class MaterialCreate(BaseModel): name: str; category: str = ""; category_id: Optional[int] = None; price_per_sqm: float; stock_quantity: float; unit: str = "kv.m"; description: str = ""; image_url: str = ""
+class MaterialUpdate(BaseModel): name: Optional[str] = None; category: Optional[str] = None; category_id: Optional[int] = None; price_per_sqm: Optional[float] = None; stock_quantity: Optional[float] = None; description: Optional[str] = None; image_url: Optional[str] = None
+class CategoryCreate(BaseModel): name: str; description: str = ""; image_url: str = ""
+class CategoryUpdate(BaseModel): name: Optional[str] = None; description: Optional[str] = None; image_url: Optional[str] = None
+class OrderItemCreate(BaseModel): material_id: str; material_name: str; width: float; height: float; quantity: int = 1; price_per_sqm: float; notes: str = ""
 class OrderCreate(BaseModel): items: List[OrderItemCreate]; notes: str = ""
 class OrderStatusUpdate(BaseModel): status: str; rejection_reason: str = ""
 class MessageCreate(BaseModel): receiver_id: str; text: str
 class AssignItemReq(BaseModel): worker_id: str
 class DeliveryInfoReq(BaseModel): driver_name: str; driver_phone: str; plate_number: str = ""
 class PaymentCreate(BaseModel): amount: float; note: str = ""
+class PushTokenReq(BaseModel): token: str; platform: Optional[str] = None
+
 
 # ─── EXCHANGE RATE (Real-time USD/UZS) ───
 @api_router.get("/exchange-rate")
@@ -1367,6 +1508,7 @@ async def complete_worker_task(oid: str, item_idx: int, user: dict = Depends(get
                 idx = 1
                 for field, value in item_updates.items():
                     if await column_exists(conn, "order_items", field):
+                        value = await normalize_datetime_for_db(conn, "order_items", field, value)
                         updates.append(f"{field} = ${idx}")
                         params.append(value)
                         idx += 1
@@ -1994,6 +2136,16 @@ async def update_settings(request: Request, user: dict = Depends(get_current_use
         now,
     )
     return dict(row)
+
+# ─── NOTIFICATIONS ───
+@api_router.post("/notifications/push-token")
+async def save_push_token(req: PushTokenReq, user: dict = Depends(get_current_user)):
+    db = await get_pool()
+    if await column_exists(db, "users", "push_token"):
+        await db.execute("UPDATE users SET push_token = $1 WHERE id = $2", req.token, int(user["id"]))
+    elif await column_exists(db, "profiles", "push_token"):
+        await db.execute("UPDATE profiles SET push_token = $1 WHERE id::text = $2", req.token, str(user["id"]))
+    return {"message": "Push token saqlandi", "token": req.token}
 
 # ─── KEEP ALIVE - PostgreSQL uxlab qolmasligi uchun ───
 async def keep_alive_task():
