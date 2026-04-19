@@ -1,0 +1,368 @@
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+"shadow*" style props are deprecated. Use "boxShadow".
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processImmediate (node:internal/timers:472:9)
+Error: Cannot pipe to a closed or destroyed stream
+    at pipelineImpl (node:internal/streams/pipeline:264:15)
+    at node:stream/promises:31:5
+    at new Promise (<anonymous>)
+    at pipeline (node:stream/promises:20:10)
+    at respond (C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:138:19)
+    at C:\Users\EliteBook\Desktop\website-repository-1\frontend\node_modules\expo-server\src\vendor\http.ts:68:13
+"shadow*" style props are deprecated. Use "boxShadow".
+"shadow*" style props are deprecated. Use "boxShadow".

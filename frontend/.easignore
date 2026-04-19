@@ -4,6 +4,11 @@ node_modules
 .next
 .metro-cache
 **/.metro-cache/**
+dist
+inspect-archive
+inspect-archive/**
+inspect-archive-novcs
+inspect-archive-novcs/**
 
 # Windows da qulflanishi mumkin bo'lgan / keraksiz fayllar (EAS tar xatosi)
 *.log

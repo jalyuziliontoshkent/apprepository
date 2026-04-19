@@ -11,13 +11,6 @@ import { api, warmBackend } from '../src/services/apiClient';
 export { api };
 
 const navigateTo = (path: string, router: ReturnType<typeof useRouter>) => {
-  if (typeof window !== 'undefined') {
-    if (window.location.pathname !== path) {
-      window.location.replace(path);
-    }
-    return;
-  }
-
   router.replace(path as never);
 };
 

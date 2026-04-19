@@ -148,6 +148,12 @@ class MemoryCache:
         self._ttl.clear()
 
 cache = MemoryCache()
+schema_cache = {
+    "tables": {},
+    "columns": {},
+    "types": {},
+    "enums": {},
+}
 
 # ─── DB Pool ───
 pool: asyncpg.Pool = None
@@ -197,12 +203,344 @@ def parse_json_field(value, default=None):
     return value
 
 
+async def table_exists(db, table_name: str) -> bool:
+    cached = schema_cache["tables"].get(table_name)
+    if cached is not None:
+        return cached
+    exists = bool(await db.fetchval(
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = $1
+        )
+        """,
+        table_name,
+    ))
+    schema_cache["tables"][table_name] = exists
+    return exists
+
+
+async def column_exists(db, table_name: str, column_name: str) -> bool:
+    cache_key = f"{table_name}.{column_name}"
+    cached = schema_cache["columns"].get(cache_key)
+    if cached is not None:
+        return cached
+    exists = bool(await db.fetchval(
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+        )
+        """,
+        table_name,
+        column_name,
+    ))
+    schema_cache["columns"][cache_key] = exists
+    return exists
+
+
+async def column_udt_name(db, table_name: str, column_name: str) -> Optional[str]:
+    cache_key = f"{table_name}.{column_name}"
+    if cache_key in schema_cache["types"]:
+        return schema_cache["types"][cache_key]
+    udt_name = await db.fetchval(
+        """
+        SELECT udt_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+        LIMIT 1
+        """,
+        table_name,
+        column_name,
+    )
+    schema_cache["types"][cache_key] = udt_name
+    return udt_name
+
+
+async def enum_values_for_column(db, table_name: str, column_name: str) -> List[str]:
+    cache_key = f"{table_name}.{column_name}"
+    cached = schema_cache["enums"].get(cache_key)
+    if cached is not None:
+        return cached
+    rows = await db.fetch(
+        """
+        SELECT e.enumlabel
+        FROM information_schema.columns c
+        JOIN pg_type t ON t.typname = c.udt_name
+        JOIN pg_enum e ON e.enumtypid = t.oid
+        WHERE c.table_schema = 'public' AND c.table_name = $1 AND c.column_name = $2
+        ORDER BY e.enumsortorder
+        """,
+        table_name,
+        column_name,
+    )
+    values = [str(row["enumlabel"]) for row in rows]
+    schema_cache["enums"][cache_key] = values
+    return values
+
+
+def build_insert_statement(table_name: str, values: dict) -> tuple[str, list]:
+    columns = list(values.keys())
+    placeholders = [f"${idx}" for idx in range(1, len(columns) + 1)]
+    sql = f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({', '.join(placeholders)}) RETURNING *"
+    return sql, [values[column] for column in columns]
+
+
+async def filter_existing_fields(db, table_name: str, values: dict) -> dict:
+    result = {}
+    for field, value in values.items():
+        if await column_exists(db, table_name, field):
+            result[field] = value
+    return result
+
+
+async def resolve_profile_id_for_user(db, user: dict) -> Optional[str]:
+    email = str(user.get("email") or "").strip().lower()
+    if not email or not await table_exists(db, "profiles"):
+        return None
+    profile_id = await db.fetchval(
+        "SELECT id::text FROM profiles WHERE lower(email) = $1 LIMIT 1",
+        email,
+    )
+    return str(profile_id) if profile_id else None
+
+
+async def resolve_actor_ids(db, user: dict) -> List[str]:
+    ids: List[str] = []
+    user_id = str(user.get("id") or "").strip()
+    if user_id:
+        ids.append(user_id)
+    profile_id = await resolve_profile_id_for_user(db, user)
+    if profile_id and profile_id not in ids:
+        ids.append(profile_id)
+    return ids
+
+
+def pick_reference_value(id_candidates: List[str], udt_name: Optional[str]):
+    candidates = [str(value).strip() for value in id_candidates if str(value).strip()]
+    if not candidates:
+        return None
+    if udt_name == "uuid":
+        for value in reversed(candidates):
+            if "-" in value:
+                return value
+        return None
+    if udt_name in {"int2", "int4", "int8"}:
+        for value in candidates:
+            if value.lstrip("-").isdigit():
+                return int(value)
+        return None
+    return candidates[0]
+
+
+async def load_user_name_map(db, id_texts: List[str]) -> dict:
+    ids = sorted({str(value).strip() for value in id_texts if str(value).strip()})
+    if not ids:
+        return {}
+    names: dict = {}
+    if await table_exists(db, "users"):
+        rows = await db.fetch(
+            """
+            SELECT id::text AS lookup_id, COALESCE(NULLIF(name, ''), email, 'User') AS display_name
+            FROM users
+            WHERE id::text = ANY($1::text[])
+            """,
+            ids,
+        )
+        for row in rows:
+            names[str(row["lookup_id"])] = row["display_name"]
+    if await table_exists(db, "profiles"):
+        rows = await db.fetch(
+            """
+            SELECT id::text AS lookup_id, COALESCE(NULLIF(name, ''), email, 'User') AS display_name
+            FROM profiles
+            WHERE id::text = ANY($1::text[])
+            """,
+            ids,
+        )
+        for row in rows:
+            names[str(row["lookup_id"])] = row["display_name"]
+    return names
+
+
+async def get_people_table(db) -> Optional[str]:
+    if await table_exists(db, "users"):
+        return "users"
+    if await table_exists(db, "profiles"):
+        return "profiles"
+    return None
+
+
+async def normalize_status_for_db(db, desired_status: str) -> str:
+    allowed = await enum_values_for_column(db, "orders", "status")
+    if not allowed or desired_status in allowed:
+        return desired_status
+    fallbacks = {
+        "kutilmoqda": ["kutilmoqda"],
+        "tasdiqlangan": ["tasdiqlangan", "tayyorlanmoqda", "kutilmoqda"],
+        "tayyorlanmoqda": ["tayyorlanmoqda", "tasdiqlangan", "kutilmoqda"],
+        "tayyor": ["tayyor", "yetkazildi"],
+        "yetkazilmoqda": ["yetkazilmoqda", "tayyor", "yetkazildi"],
+        "yetkazildi": ["yetkazildi", "tayyor"],
+        "rad_etilgan": ["rad_etilgan", "kutilmoqda"],
+    }
+    for candidate in fallbacks.get(desired_status, [desired_status]):
+        if candidate in allowed:
+            return candidate
+    return allowed[0]
+
+
+async def fetch_order_row(db, order_id: str):
+    return await db.fetchrow("SELECT * FROM orders WHERE id::text = $1", str(order_id))
+
+
+async def update_order_fields(conn, order_id: str, values: dict) -> None:
+    updates = []
+    params = []
+    idx = 1
+    for field, value in values.items():
+        if await column_exists(conn, "orders", field):
+            updates.append(f"{field} = ${idx}")
+            params.append(value)
+            idx += 1
+    if not updates:
+        return
+    params.append(str(order_id))
+    await conn.execute(
+        f"UPDATE orders SET {', '.join(updates)} WHERE id::text = ${idx}",
+        *params,
+    )
+
+
+async def fetch_order_items_map(db, order_rows: List[dict]) -> dict:
+    orders = [row_to_dict(row) for row in order_rows if row is not None]
+    order_ids = [str(order["id"]) for order in orders if order.get("id") is not None]
+    if not order_ids:
+        return {}
+
+    if await column_exists(db, "orders", "items"):
+        result = {}
+        for order in orders:
+            raw_items = parse_json_field(order.get("items"), default=[]) or []
+            normalized_items = []
+            for item in raw_items:
+                current = dict(item)
+                if current.get("material_id") is not None:
+                    current["material_id"] = str(current["material_id"])
+                if current.get("assigned_worker_id") not in (None, ""):
+                    current["assigned_worker_id"] = str(current["assigned_worker_id"])
+                normalized_items.append(current)
+            result[str(order["id"])] = normalized_items
+        return result
+
+    if not await table_exists(db, "order_items"):
+        return {order_id: [] for order_id in order_ids}
+
+    worker_refs_by_order = {
+        str(order["id"]): str(order["worker_id"])
+        for order in orders
+        if order.get("worker_id") not in (None, "")
+    }
+    worker_names = await load_user_name_map(db, list(worker_refs_by_order.values()))
+    rows = await db.fetch(
+        """
+        SELECT *
+        FROM order_items
+        WHERE order_id::text = ANY($1::text[])
+        ORDER BY order_id::text ASC, COALESCE(item_index, 0) ASC, created_at ASC
+        """,
+        order_ids,
+    )
+
+    result = {order_id: [] for order_id in order_ids}
+    for row in rows:
+        item = row_to_dict(row)
+        order_id = str(item["order_id"])
+        assigned_worker_id = worker_refs_by_order.get(order_id, "")
+        result.setdefault(order_id, []).append({
+            "id": str(item["id"]),
+            "material_id": str(item["material_id"]) if item.get("material_id") is not None else "",
+            "material_name": item.get("material_name", ""),
+            "width": float(item.get("width") or 0),
+            "height": float(item.get("height") or 0),
+            "quantity": int(item.get("quantity") or 1),
+            "exact_sqm": round(float(item.get("sqm") or 0), 4),
+            "billable_sqm": round(float(item.get("sqm") or 0), 2),
+            "sqm": round(float(item.get("sqm") or 0), 2),
+            "price_per_sqm": float(item.get("unit_price") or 0),
+            "price": round_money(item.get("total_price") or 0),
+            "total_price": round_money(item.get("total_price") or 0),
+            "notes": item.get("notes") or "",
+            "assigned_worker_id": assigned_worker_id,
+            "assigned_worker_name": worker_names.get(assigned_worker_id, ""),
+            "worker_status": item.get("worker_status") or ("assigned" if assigned_worker_id else "pending"),
+        })
+    return result
+
+
+async def serialize_orders(db, rows) -> List[dict]:
+    order_rows = [row_to_dict(row) for row in rows if row is not None]
+    if not order_rows:
+        return []
+
+    items_map = await fetch_order_items_map(db, order_rows)
+    lookup_ids = []
+    for order in order_rows:
+        if order.get("dealer_id") not in (None, ""):
+            lookup_ids.append(str(order["dealer_id"]))
+        if order.get("worker_id") not in (None, ""):
+            lookup_ids.append(str(order["worker_id"]))
+    for items in items_map.values():
+        for item in items:
+            if item.get("assigned_worker_id"):
+                lookup_ids.append(str(item["assigned_worker_id"]))
+    user_names = await load_user_name_map(db, lookup_ids)
+
+    out = []
+    for order in order_rows:
+        order_id = str(order["id"])
+        dealer_id = str(order["dealer_id"]) if order.get("dealer_id") is not None else ""
+        worker_id = str(order["worker_id"]) if order.get("worker_id") is not None else ""
+        delivery_info = parse_json_field(order.get("delivery_info"), default=None)
+        items = items_map.get(order_id, [])
+
+        for item in items:
+            fallback_worker_id = item.get("assigned_worker_id") or worker_id
+            if fallback_worker_id:
+                item["assigned_worker_id"] = str(fallback_worker_id)
+                item["assigned_worker_name"] = item.get("assigned_worker_name") or user_names.get(str(fallback_worker_id), "")
+                if item.get("worker_status") in (None, "", "pending"):
+                    item["worker_status"] = "assigned"
+
+        current = dict(order)
+        current["id"] = order_id
+        current["dealer_id"] = dealer_id
+        current["dealer_name"] = current.get("dealer_name") or user_names.get(dealer_id, "")
+        current["items"] = items
+        current["delivery_info"] = delivery_info
+        if worker_id:
+            current["worker_id"] = worker_id
+        out.append(current)
+
+    return out
+
+
+async def serialize_order(db, row):
+    orders = await serialize_orders(db, [row] if row is not None else [])
+    return orders[0] if orders else None
+
+
 def serialize_order_record(row):
     order = row_to_dict(row)
     if order is None:
         return None
     order["id"] = str(order["id"])
-    order["dealer_id"] = str(order["dealer_id"])
+    if order.get("dealer_id") is not None:
+        order["dealer_id"] = str(order["dealer_id"])
+    if order.get("worker_id") is not None:
+        order["worker_id"] = str(order["worker_id"])
     order["items"] = parse_json_field(order.get("items"), default=[]) or []
     order["delivery_info"] = parse_json_field(order.get("delivery_info"), default=None)
     return order
@@ -250,31 +588,53 @@ async def deduct_inventory_for_order(conn, order_row, now: str):
     if order.get("inventory_deducted"):
         return
 
-    items = parse_json_field(order.get("items"), default=[]) or []
-    required_by_material = {}
+    order_id = str(order["id"])
+    if not await column_exists(conn, "materials", "stock_quantity"):
+        await update_order_fields(conn, order_id, {"inventory_deducted": True, "updated_at": now})
+        return
+
+    if await column_exists(conn, "orders", "items"):
+        items = parse_json_field(order.get("items"), default=[]) or []
+    elif await table_exists(conn, "order_items"):
+        item_rows = await conn.fetch(
+            "SELECT material_id, sqm FROM order_items WHERE order_id::text = $1",
+            order_id,
+        )
+        items = [
+            {
+                "material_id": row["material_id"],
+                "billable_sqm": row["sqm"],
+                "sqm": row["sqm"],
+            }
+            for row in item_rows
+        ]
+    else:
+        items = []
+
+    required_by_material: dict[str, float] = {}
 
     for item in items:
         material_id = item.get("material_id")
         sqm = float(item.get("billable_sqm") or item.get("sqm") or 0)
         if not material_id or sqm <= 0:
             continue
-        mid = int(material_id)
+        mid = str(material_id)
         required_by_material[mid] = round_money(required_by_material.get(mid, 0) + sqm)
 
     if not required_by_material:
-        await conn.execute(
-            "UPDATE orders SET inventory_deducted = TRUE, updated_at = $1 WHERE id = $2",
-            now,
-            int(order["id"]),
-        )
+        await update_order_fields(conn, order_id, {"inventory_deducted": True, "updated_at": now})
         return
 
     material_ids = list(required_by_material.keys())
     material_rows = await conn.fetch(
-        "SELECT id, name, stock_quantity, unit FROM materials WHERE id = ANY($1::int[])",
+        """
+        SELECT id::text AS lookup_id, name, stock_quantity, COALESCE(unit, 'kv.m') AS unit
+        FROM materials
+        WHERE id::text = ANY($1::text[])
+        """,
         material_ids,
     )
-    materials = {int(row["id"]): row for row in material_rows}
+    materials = {str(row["lookup_id"]): row for row in material_rows}
     shortages = []
 
     for material_id, required_sqm in required_by_material.items():
@@ -293,16 +653,12 @@ async def deduct_inventory_for_order(conn, order_row, now: str):
 
     for material_id, required_sqm in required_by_material.items():
         await conn.execute(
-            "UPDATE materials SET stock_quantity = stock_quantity - $1 WHERE id = $2",
+            "UPDATE materials SET stock_quantity = stock_quantity - $1 WHERE id::text = $2",
             required_sqm,
             material_id,
         )
 
-    await conn.execute(
-        "UPDATE orders SET inventory_deducted = TRUE, updated_at = $1 WHERE id = $2",
-        now,
-        int(order["id"]),
-    )
+    await update_order_fields(conn, order_id, {"inventory_deducted": True, "updated_at": now})
 
 async def get_current_user(request: Request) -> dict:
     auth = request.headers.get("Authorization", "")
@@ -558,10 +914,14 @@ async def delete_worker(wid: str, admin: dict = Depends(require_admin)):
 async def create_category(d: CategoryCreate, admin: dict = Depends(require_admin)):
     db = await get_pool()
     now = datetime.now(timezone.utc).isoformat()
-    row = await db.fetchrow(
-        "INSERT INTO categories (name, description, image_url, created_at) VALUES ($1,$2,$3,$4) RETURNING *",
-        d.name, d.description, d.image_url, now
-    )
+    values = await filter_existing_fields(db, "categories", {
+        "name": d.name,
+        "description": d.description,
+        "image_url": d.image_url,
+        "created_at": now,
+    })
+    sql, params = build_insert_statement("categories", values)
+    row = await db.fetchrow(sql, *params)
     c = row_to_dict(row); c["id"] = str(c["id"])
     cache.invalidate("categories", "materials")
     return c
@@ -575,7 +935,10 @@ async def list_categories(user: dict = Depends(get_current_user)):
     out = []
     for r in rows:
         c = row_to_dict(r); c["id"] = str(c["id"])
-        c["material_count"] = await db.fetchval("SELECT COUNT(*) FROM materials WHERE category_id = $1", r["id"])
+        c["material_count"] = await db.fetchval(
+            "SELECT COUNT(*) FROM materials WHERE category_id::text = $1",
+            str(r["id"]),
+        )
         out.append(c)
     cache.set("categories_list", out, 60)
     return out
@@ -589,9 +952,9 @@ async def update_category(cid: str, d: CategoryUpdate, admin: dict = Depends(req
         if val is not None:
             updates.append(f"{field} = ${idx}"); params.append(val); idx += 1
     if not updates: raise HTTPException(400, "No data")
-    params.append(int(cid))
-    await db.execute(f"UPDATE categories SET {', '.join(updates)} WHERE id = ${idx}", *params)
-    row = await db.fetchrow("SELECT * FROM categories WHERE id = $1", int(cid))
+    params.append(str(cid))
+    await db.execute(f"UPDATE categories SET {', '.join(updates)} WHERE id::text = ${idx}", *params)
+    row = await db.fetchrow("SELECT * FROM categories WHERE id::text = $1", str(cid))
     c = row_to_dict(row); c["id"] = str(c["id"])
     cache.invalidate("categories", "materials")
     return c
@@ -599,10 +962,13 @@ async def update_category(cid: str, d: CategoryUpdate, admin: dict = Depends(req
 @api_router.delete("/categories/{cid}")
 async def delete_category(cid: str, admin: dict = Depends(require_admin)):
     db = await get_pool()
-    mat_count = await db.fetchval("SELECT COUNT(*) FROM materials WHERE category_id = $1", int(cid))
+    mat_count = await db.fetchval(
+        "SELECT COUNT(*) FROM materials WHERE category_id::text = $1",
+        str(cid),
+    )
     if mat_count > 0:
         raise HTTPException(400, f"Bu kategoriyada {mat_count} ta mahsulot bor. Avval mahsulotlarni ko'chiring.")
-    result = await db.execute("DELETE FROM categories WHERE id = $1", int(cid))
+    result = await db.execute("DELETE FROM categories WHERE id::text = $1", str(cid))
     if result == "DELETE 0": raise HTTPException(404, "Not found")
     cache.invalidate("categories", "materials")
     return {"message": "Deleted"}
@@ -612,10 +978,20 @@ async def delete_category(cid: str, admin: dict = Depends(require_admin)):
 async def create_material(d: MaterialCreate, admin: dict = Depends(require_admin)):
     db = await get_pool()
     now = datetime.now(timezone.utc).isoformat()
-    row = await db.fetchrow(
-        "INSERT INTO materials (name, category, category_id, price_per_sqm, stock_quantity, unit, description, image_url, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *",
-        d.name, d.category, d.category_id, d.price_per_sqm, d.stock_quantity, d.unit, d.description, d.image_url, now
-    )
+    values = await filter_existing_fields(db, "materials", {
+        "name": d.name,
+        "category": d.category,
+        "category_id": d.category_id,
+        "price_per_sqm": d.price_per_sqm,
+        "stock_quantity": d.stock_quantity,
+        "unit": d.unit,
+        "description": d.description,
+        "image_url": d.image_url,
+        "created_at": now,
+        "updated_at": now,
+    })
+    sql, params = build_insert_statement("materials", values)
+    row = await db.fetchrow(sql, *params)
     m = row_to_dict(row); m["id"] = str(m["id"])
     if m.get("category_id"): m["category_id"] = str(m["category_id"])
     cache.invalidate("materials", "categories", "stats", "alerts")
@@ -626,11 +1002,25 @@ async def list_materials(user: dict = Depends(get_current_user)):
     cached = cache.get("materials_list")
     if cached: return cached
     db = await get_pool()
-    rows = await db.fetch("SELECT m.*, c.name as category_name FROM materials m LEFT JOIN categories c ON m.category_id = c.id ORDER BY c.name ASC, m.name ASC")
+    if await table_exists(db, "categories") and await column_exists(db, "materials", "category_id"):
+        rows = await db.fetch(
+            """
+            SELECT m.*, c.name as category_name
+            FROM materials m
+            LEFT JOIN categories c ON m.category_id::text = c.id::text
+            ORDER BY c.name ASC NULLS LAST, m.name ASC
+            """
+        )
+    else:
+        rows = await db.fetch("SELECT * FROM materials ORDER BY name ASC")
     out = []
     for r in rows:
         m = row_to_dict(r); m["id"] = str(m["id"])
         if m.get("category_id"): m["category_id"] = str(m["category_id"])
+        m.setdefault("stock_quantity", 0)
+        m.setdefault("unit", "kv.m")
+        m.setdefault("category", "")
+        m.setdefault("description", "")
         out.append(m)
     cache.set("materials_list", out, 60)
     return out
@@ -641,11 +1031,13 @@ async def list_materials_by_category(cid: str, user: dict = Depends(get_current_
     cached = cache.get(cache_key)
     if cached: return cached
     db = await get_pool()
-    rows = await db.fetch("SELECT * FROM materials WHERE category_id = $1 ORDER BY name ASC", int(cid))
+    rows = await db.fetch("SELECT * FROM materials WHERE category_id::text = $1 ORDER BY name ASC", str(cid))
     out = []
     for r in rows:
         m = row_to_dict(r); m["id"] = str(m["id"])
         if m.get("category_id"): m["category_id"] = str(m["category_id"])
+        m.setdefault("stock_quantity", 0)
+        m.setdefault("unit", "kv.m")
         out.append(m)
     cache.set(cache_key, out, 60)
     return out
@@ -658,14 +1050,14 @@ async def update_material(mid: str, d: MaterialUpdate, admin: dict = Depends(req
     idx = 1
     for field in ["name", "category", "price_per_sqm", "stock_quantity", "description", "image_url", "category_id"]:
         val = getattr(d, field, None)
-        if val is not None:
+        if val is not None and await column_exists(db, "materials", field):
             updates.append(f"{field} = ${idx}")
             params.append(val)
             idx += 1
     if not updates: raise HTTPException(400, "No data")
-    params.append(int(mid))
-    await db.execute(f"UPDATE materials SET {', '.join(updates)} WHERE id = ${idx}", *params)
-    row = await db.fetchrow("SELECT * FROM materials WHERE id = $1", int(mid))
+    params.append(str(mid))
+    await db.execute(f"UPDATE materials SET {', '.join(updates)} WHERE id::text = ${idx}", *params)
+    row = await db.fetchrow("SELECT * FROM materials WHERE id::text = $1", str(mid))
     m = row_to_dict(row)
     m["id"] = str(m["id"])
     cache.invalidate("materials", "categories", "alerts")
@@ -674,7 +1066,7 @@ async def update_material(mid: str, d: MaterialUpdate, admin: dict = Depends(req
 @api_router.delete("/materials/{mid}")
 async def delete_material(mid: str, admin: dict = Depends(require_admin)):
     db = await get_pool()
-    result = await db.execute("DELETE FROM materials WHERE id = $1", int(mid))
+    result = await db.execute("DELETE FROM materials WHERE id::text = $1", str(mid))
     if result == "DELETE 0": raise HTTPException(404, "Not found")
     cache.invalidate("materials", "categories", "stats", "alerts")
     return {"message": "Deleted"}
@@ -705,29 +1097,75 @@ async def create_order(data: OrderCreate, user: dict = Depends(get_current_user)
 
     async with pool.acquire() as conn:
         async with conn.transaction():
-            row = await conn.fetchrow(
-                "INSERT INTO orders (order_code, dealer_id, dealer_name, items, total_sqm, total_price, status, notes, rejection_reason, delivery_info, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *",
-                order_code,
-                int(user["id"]),
-                user.get("name", ""),
-                json.dumps(items),
-                round_money(total_sqm),
-                round_money(total_price),
-                "kutilmoqda",
-                data.notes,
-                "",
-                None,
-                now,
-                now,
-            )
-            await conn.execute(
-                "UPDATE users SET debt = debt + $1 WHERE id = $2",
-                round_money(total_price),
-                int(user["id"]),
-            )
+            status_value = await normalize_status_for_db(conn, "kutilmoqda")
+            dealer_ids = await resolve_actor_ids(conn, user)
+            dealer_ref = pick_reference_value(dealer_ids, await column_udt_name(conn, "orders", "dealer_id"))
+            if await column_exists(conn, "orders", "dealer_id") and dealer_ref is None:
+                raise HTTPException(400, "Diler profili topilmadi. Admin diler akkauntini qayta yaratib ko'ring.")
+
+            if await column_exists(conn, "orders", "items"):
+                order_values = await filter_existing_fields(conn, "orders", {
+                    "order_code": order_code,
+                    "dealer_id": dealer_ref,
+                    "dealer_name": user.get("name", ""),
+                    "items": json.dumps(items),
+                    "total_sqm": round_money(total_sqm),
+                    "total_price": round_money(total_price),
+                    "status": status_value,
+                    "notes": data.notes,
+                    "rejection_reason": "",
+                    "delivery_info": None,
+                    "created_at": now,
+                    "updated_at": now,
+                })
+                sql, params = build_insert_statement("orders", order_values)
+                row = await conn.fetchrow(sql, *params)
+            else:
+                order_values = await filter_existing_fields(conn, "orders", {
+                    "order_code": order_code,
+                    "dealer_id": dealer_ref,
+                    "dealer_name": user.get("name", ""),
+                    "total_sqm": round_money(total_sqm),
+                    "total_price": round_money(total_price),
+                    "status": status_value,
+                    "notes": data.notes,
+                    "created_at": now,
+                    "updated_at": now,
+                })
+                sql, params = build_insert_statement("orders", order_values)
+                row = await conn.fetchrow(sql, *params)
+
+                if await table_exists(conn, "order_items"):
+                    material_udt = await column_udt_name(conn, "order_items", "material_id")
+                    for item_index, item in enumerate(items):
+                        item_values = await filter_existing_fields(conn, "order_items", {
+                            "order_id": row["id"],
+                            "material_id": pick_reference_value([item["material_id"]], material_udt),
+                            "material_name": item["material_name"],
+                            "width": item["width"],
+                            "height": item["height"],
+                            "quantity": item.get("quantity", 1),
+                            "sqm": item["sqm"],
+                            "unit_price": item["price_per_sqm"],
+                            "total_price": item["price"],
+                            "notes": item.get("notes", ""),
+                            "worker_status": "pending",
+                            "item_index": item_index,
+                            "created_at": now,
+                            "updated_at": now,
+                        })
+                        sql, params = build_insert_statement("order_items", item_values)
+                        await conn.fetchrow(sql, *params)
+
+            if await table_exists(conn, "users") and await column_exists(conn, "users", "debt"):
+                await conn.execute(
+                    "UPDATE users SET debt = COALESCE(debt, 0) + $1 WHERE id::text = $2",
+                    round_money(total_price),
+                    str(user["id"]),
+                )
 
     cache.invalidate("orders", "stats", "reports")
-    return serialize_order_record(row)
+    return await serialize_order(pool, row)
 
 @api_router.get("/orders")
 async def list_orders(user: dict = Depends(get_current_user)):
@@ -736,20 +1174,33 @@ async def list_orders(user: dict = Depends(get_current_user)):
     if cached: return cached
     db = await get_pool()
     if user.get("role") == "dealer":
-        rows = await db.fetch("SELECT * FROM orders WHERE dealer_id = $1 ORDER BY created_at DESC", int(user["id"]))
+        actor_ids = await resolve_actor_ids(db, user)
+        rows = await db.fetch(
+            "SELECT * FROM orders WHERE dealer_id::text = ANY($1::text[]) ORDER BY created_at DESC",
+            actor_ids,
+        )
+    elif user.get("role") == "worker" and await column_exists(db, "orders", "worker_id"):
+        actor_ids = await resolve_actor_ids(db, user)
+        rows = await db.fetch(
+            "SELECT * FROM orders WHERE worker_id::text = ANY($1::text[]) ORDER BY created_at DESC",
+            actor_ids,
+        )
     else:
         rows = await db.fetch("SELECT * FROM orders ORDER BY created_at DESC")
-    out = [serialize_order_record(r) for r in rows]
+    out = await serialize_orders(db, rows)
     cache.set(cache_key, out, 15)
     return out
 
 @api_router.get("/orders/{oid}")
 async def get_order(oid: str, user: dict = Depends(get_current_user)):
     db = await get_pool()
-    o = await db.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+    o = await fetch_order_row(db, oid)
     if not o: raise HTTPException(404, "Not found")
-    o = serialize_order_record(o)
-    if user.get("role") == "dealer" and str(o["dealer_id"]) != user["id"]: raise HTTPException(403)
+    o = await serialize_order(db, o)
+    if user.get("role") == "dealer":
+        actor_ids = await resolve_actor_ids(db, user)
+        if str(o["dealer_id"]) not in actor_ids:
+            raise HTTPException(403)
     return o
 
 @api_router.put("/orders/{oid}/status")
@@ -763,69 +1214,97 @@ async def update_order_status(oid: str, data: OrderStatusUpdate, admin: dict = D
 
     async with pool.acquire() as conn:
         async with conn.transaction():
-            order = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+            order = await fetch_order_row(conn, oid)
             if not order:
                 raise HTTPException(404, "Not found")
 
             if data.status in INVENTORY_SYNC_STATUSES:
                 await deduct_inventory_for_order(conn, order, now)
 
+            changes = {
+                "status": await normalize_status_for_db(conn, data.status),
+                "updated_at": now,
+            }
             if data.status == "rad_etilgan" and data.rejection_reason:
-                await conn.execute(
-                    "UPDATE orders SET status = $1, rejection_reason = $2, updated_at = $3 WHERE id = $4",
-                    data.status,
-                    data.rejection_reason,
-                    now,
-                    int(oid),
-                )
-            else:
-                await conn.execute(
-                    "UPDATE orders SET status = $1, updated_at = $2 WHERE id = $3",
-                    data.status,
-                    now,
-                    int(oid),
-                )
-            updated = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+                changes["rejection_reason"] = data.rejection_reason
+            await update_order_fields(conn, oid, changes)
+            updated = await fetch_order_row(conn, oid)
 
     cache.invalidate("orders", "stats", "reports", "materials", "alerts")
-    return serialize_order_record(updated)
+    return await serialize_order(pool, updated)
 
 # ─── WORKER: Assign item to worker ───
 @api_router.put("/orders/{oid}/items/{item_idx}/assign")
 async def assign_item_to_worker(oid: str, item_idx: int, data: AssignItemReq, admin: dict = Depends(require_admin)):
     db = await get_pool()
-    order = await db.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+    order = await fetch_order_row(db, oid)
     if not order: raise HTTPException(404, "Order not found")
-    items = json.loads(order["items"]) if isinstance(order["items"], str) else order["items"]
-    if item_idx >= len(items): raise HTTPException(400, "Invalid item index")
-    worker = await db.fetchrow("SELECT * FROM users WHERE id = $1 AND role = 'worker'", int(data.worker_id))
+    worker = await db.fetchrow("SELECT * FROM users WHERE id::text = $1 AND role = 'worker'", str(data.worker_id))
     if not worker: raise HTTPException(404, "Worker not found")
-    items[item_idx]["assigned_worker_id"] = data.worker_id
-    items[item_idx]["assigned_worker_name"] = worker["name"]
-    items[item_idx]["worker_status"] = "assigned"
-    await db.execute("UPDATE orders SET items = $1 WHERE id = $2", json.dumps(items), int(oid))
-    o = await db.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
-    o = row_to_dict(o)
-    o["id"] = str(o["id"])
-    o["dealer_id"] = str(o["dealer_id"])
-    o["items"] = json.loads(o["items"]) if isinstance(o["items"], str) else o["items"]
-    o["delivery_info"] = json.loads(o["delivery_info"]) if isinstance(o["delivery_info"], str) and o["delivery_info"] else o["delivery_info"]
+    if await column_exists(db, "orders", "items"):
+        items = parse_json_field(order.get("items"), default=[]) or []
+        if item_idx >= len(items): raise HTTPException(400, "Invalid item index")
+        items[item_idx]["assigned_worker_id"] = str(data.worker_id)
+        items[item_idx]["assigned_worker_name"] = worker["name"]
+        items[item_idx]["worker_status"] = "assigned"
+        await update_order_fields(db, oid, {"items": json.dumps(items)})
+    else:
+        item_rows = await db.fetch(
+            """
+            SELECT *
+            FROM order_items
+            WHERE order_id::text = $1
+            ORDER BY COALESCE(item_index, 0) ASC, created_at ASC
+            """,
+            str(oid),
+        )
+        if item_idx >= len(item_rows):
+            raise HTTPException(400, "Invalid item index")
+        worker_data = row_to_dict(worker)
+        worker_data["id"] = str(worker_data["id"])
+        worker_ids = await resolve_actor_ids(db, worker_data)
+        worker_ref = pick_reference_value(worker_ids, await column_udt_name(db, "orders", "worker_id"))
+        if await column_exists(db, "orders", "worker_id") and worker_ref is None:
+            raise HTTPException(400, "Ishchi profili topilmadi. Ishchini qayta yaratib ko'ring.")
+        await update_order_fields(db, oid, {"worker_id": worker_ref, "updated_at": datetime.now(timezone.utc).isoformat()})
+    o = await fetch_order_row(db, oid)
     cache.invalidate("orders")
-    return o
+    return await serialize_order(db, o)
 
 # ─── WORKER: Get my assigned items ───
 @api_router.get("/worker/tasks")
 async def get_worker_tasks(user: dict = Depends(get_current_user)):
     if user.get("role") != "worker": raise HTTPException(403)
     db = await get_pool()
-    rows = await db.fetch("SELECT * FROM orders WHERE status IN ('tasdiqlangan','tayyorlanmoqda')")
+    actor_ids = await resolve_actor_ids(db, user)
+    rows = await db.fetch(
+        """
+        SELECT *
+        FROM orders
+        WHERE status::text IN ('tasdiqlangan', 'tayyorlanmoqda', 'tayyor')
+        ORDER BY created_at DESC
+        """
+    )
+    orders = await serialize_orders(db, rows)
     tasks = []
-    for r in rows:
-        o = row_to_dict(r)
-        items = json.loads(o["items"]) if isinstance(o["items"], str) else o["items"]
-        for idx, item in enumerate(items):
-            if item.get("assigned_worker_id") == user["id"]:
-                tasks.append({"order_id": str(o["id"]), "order_code": o.get("order_code", ""), "dealer_name": o.get("dealer_name", ""), "item_index": idx, "material_name": item["material_name"], "width": item["width"], "height": item["height"], "sqm": item["sqm"], "notes": item.get("notes", ""), "worker_status": item.get("worker_status", "assigned"), "created_at": o["created_at"]})
+    for o in orders:
+        order_worker_id = str(o.get("worker_id") or "")
+        for idx, item in enumerate(o.get("items") or []):
+            assigned_worker_id = str(item.get("assigned_worker_id") or order_worker_id or "")
+            if assigned_worker_id and assigned_worker_id in actor_ids:
+                tasks.append({
+                    "order_id": str(o["id"]),
+                    "order_code": o.get("order_code", ""),
+                    "dealer_name": o.get("dealer_name", ""),
+                    "item_index": idx,
+                    "material_name": item.get("material_name", ""),
+                    "width": item.get("width", 0),
+                    "height": item.get("height", 0),
+                    "sqm": item.get("sqm", 0),
+                    "notes": item.get("notes", ""),
+                    "worker_status": item.get("worker_status", "assigned"),
+                    "created_at": o.get("created_at"),
+                })
     return tasks
 
 # ─── WORKER: Mark item as completed ───
@@ -835,58 +1314,88 @@ async def complete_worker_task(oid: str, item_idx: int, user: dict = Depends(get
         raise HTTPException(403)
     pool = await get_pool()
     now = datetime.now(timezone.utc).isoformat()
+    actor_ids = await resolve_actor_ids(pool, user)
     async with pool.acquire() as conn:
         async with conn.transaction():
-            order = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+            order = await fetch_order_row(conn, oid)
             if not order:
                 raise HTTPException(404)
-            items = parse_json_field(order["items"], default=[]) or []
-            if item_idx >= len(items):
-                raise HTTPException(400)
-            if items[item_idx].get("assigned_worker_id") != user["id"]:
-                raise HTTPException(403, "Not your task")
-            if items[item_idx].get("worker_status") == "completed":
-                current = serialize_order_record(order)
-                current["items"] = items
-                return current
-            items[item_idx]["worker_status"] = "completed"
-            await conn.execute(
-                "UPDATE orders SET items = $1, updated_at = $2 WHERE id = $3",
-                json.dumps(items),
-                now,
-                int(oid),
-            )
 
-            all_done = all(it.get("worker_status") == "completed" for it in items if it.get("assigned_worker_id"))
-            if all_done:
-                refreshed_order = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
-                await deduct_inventory_for_order(conn, refreshed_order, now)
-                await conn.execute("UPDATE orders SET status = 'tayyor', updated_at = $1 WHERE id = $2", now, int(oid))
-                admin_row = await conn.fetchrow("SELECT id, name FROM users WHERE role = 'admin' LIMIT 1")
-                if admin_row and order["dealer_id"]:
-                    await conn.execute(
-                        "INSERT INTO messages (sender_id, sender_name, sender_role, receiver_id, text, read, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
-                        admin_row["id"], admin_row["name"] or "Admin", "admin", order["dealer_id"],
-                        f"Buyurtma #{order['order_code']} tayyor! Barcha ishlar tugallandi.",
-                        False, now
-                    )
-                logger.info("Buyurtma #%s tayyor - dilerga xabar yuborildi", order["order_code"])
+            if await column_exists(conn, "orders", "items"):
+                items = parse_json_field(order["items"], default=[]) or []
+                if item_idx >= len(items):
+                    raise HTTPException(400)
+                assigned_worker_id = str(items[item_idx].get("assigned_worker_id") or "")
+                if assigned_worker_id and assigned_worker_id not in actor_ids:
+                    raise HTTPException(403, "Not your task")
+                if items[item_idx].get("worker_status") == "completed":
+                    current = await serialize_order(conn, order)
+                    current["items"] = items
+                    return current
+                items[item_idx]["worker_status"] = "completed"
+                changes = {"items": json.dumps(items), "updated_at": now}
+
+                all_done = all(it.get("worker_status") == "completed" for it in items if it.get("assigned_worker_id"))
+                if all_done:
+                    refreshed_order = dict(row_to_dict(order))
+                    refreshed_order["items"] = json.dumps(items)
+                    await deduct_inventory_for_order(conn, refreshed_order, now)
+                    changes["status"] = await normalize_status_for_db(conn, "tayyor")
+                await update_order_fields(conn, oid, changes)
             else:
-                admin_row = await conn.fetchrow("SELECT id FROM users WHERE role = 'admin' LIMIT 1")
-                if admin_row:
-                    completed_count = sum(1 for it in items if it.get("worker_status") == "completed")
-                    total_assigned = sum(1 for it in items if it.get("assigned_worker_id"))
-                    await conn.execute(
-                        "INSERT INTO messages (sender_id, sender_name, sender_role, receiver_id, text, read, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
-                        int(user["id"]), user.get("name", "Ishchi"), "worker", admin_row["id"],
-                        f"#{order['order_code']}: {items[item_idx]['material_name']} tayyor ({completed_count}/{total_assigned})",
-                        False, now
-                    )
+                item_rows = await conn.fetch(
+                    """
+                    SELECT *
+                    FROM order_items
+                    WHERE order_id::text = $1
+                    ORDER BY COALESCE(item_index, 0) ASC, created_at ASC
+                    """,
+                    str(oid),
+                )
+                if item_idx >= len(item_rows):
+                    raise HTTPException(400)
+                order_worker_id = str(order.get("worker_id") or "")
+                if order_worker_id and order_worker_id not in actor_ids:
+                    raise HTTPException(403, "Not your task")
+                item_row = row_to_dict(item_rows[item_idx])
+                if str(item_row.get("worker_status") or "") == "completed":
+                    return await serialize_order(conn, order)
 
-            updated = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+                item_updates = {"worker_status": "completed", "updated_at": now}
+                updates = []
+                params = []
+                idx = 1
+                for field, value in item_updates.items():
+                    if await column_exists(conn, "order_items", field):
+                        updates.append(f"{field} = ${idx}")
+                        params.append(value)
+                        idx += 1
+                params.append(str(item_row["id"]))
+                await conn.execute(
+                    f"UPDATE order_items SET {', '.join(updates)} WHERE id::text = ${idx}",
+                    *params,
+                )
+
+                remaining = await conn.fetchval(
+                    """
+                    SELECT COUNT(*)
+                    FROM order_items
+                    WHERE order_id::text = $1 AND worker_status::text != 'completed'
+                    """,
+                    str(oid),
+                )
+                if int(remaining or 0) == 0:
+                    refreshed_order = await fetch_order_row(conn, oid)
+                    await deduct_inventory_for_order(conn, refreshed_order, now)
+                    await update_order_fields(conn, oid, {
+                        "status": await normalize_status_for_db(conn, "tayyor"),
+                        "updated_at": now,
+                    })
+
+            updated = await fetch_order_row(conn, oid)
 
     cache.invalidate("orders", "stats", "reports", "materials", "alerts")
-    return serialize_order_record(updated)
+    return await serialize_order(pool, updated)
 # ─── DELIVERY: Assign delivery info directly to order ───
 @api_router.put("/orders/{oid}/delivery")
 async def assign_delivery(oid: str, data: DeliveryInfoReq, admin: dict = Depends(require_admin)):
@@ -895,14 +1404,18 @@ async def assign_delivery(oid: str, data: DeliveryInfoReq, admin: dict = Depends
     now = datetime.now(timezone.utc).isoformat()
     async with pool.acquire() as conn:
         async with conn.transaction():
-            order = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+            order = await fetch_order_row(conn, oid)
             if not order:
                 raise HTTPException(404, "Buyurtma topilmadi")
             await deduct_inventory_for_order(conn, order, now)
-            await conn.execute("UPDATE orders SET delivery_info = $1, status = 'yetkazilmoqda', updated_at = $2 WHERE id = $3", d_info, now, int(oid))
-            updated = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+            await update_order_fields(conn, oid, {
+                "delivery_info": d_info,
+                "status": await normalize_status_for_db(conn, "yetkazilmoqda"),
+                "updated_at": now,
+            })
+            updated = await fetch_order_row(conn, oid)
     cache.invalidate("orders", "stats", "materials", "alerts")
-    return serialize_order_record(updated)
+    return await serialize_order(pool, updated)
 
 # ─── DELIVERY: Admin confirms delivery ───
 @api_router.put("/orders/{oid}/confirm-delivery")
@@ -911,14 +1424,17 @@ async def confirm_delivery(oid: str, admin: dict = Depends(require_admin)):
     now = datetime.now(timezone.utc).isoformat()
     async with pool.acquire() as conn:
         async with conn.transaction():
-            order = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+            order = await fetch_order_row(conn, oid)
             if not order:
                 raise HTTPException(404, "Buyurtma topilmadi")
             await deduct_inventory_for_order(conn, order, now)
-            await conn.execute("UPDATE orders SET status = 'yetkazildi', updated_at = $1 WHERE id = $2", now, int(oid))
-            updated = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", int(oid))
+            await update_order_fields(conn, oid, {
+                "status": await normalize_status_for_db(conn, "yetkazildi"),
+                "updated_at": now,
+            })
+            updated = await fetch_order_row(conn, oid)
     cache.invalidate("orders", "stats", "reports", "materials", "alerts")
-    return serialize_order_record(updated)
+    return await serialize_order(pool, updated)
 
 # ─── CHAT ───
 @api_router.post("/messages")
@@ -1015,18 +1531,25 @@ async def get_statistics(admin: dict = Depends(require_admin)):
     cached = cache.get("stats_all")
     if cached: return cached
     db = await get_pool()
-    total_revenue = await db.fetchval("SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE status IN ('tasdiqlangan','tayyorlanmoqda','tayyor','yetkazilmoqda','yetkazildi')")
+    people_table = await get_people_table(db)
+    total_revenue = await db.fetchval(
+        """
+        SELECT COALESCE(SUM(total_price), 0)
+        FROM orders
+        WHERE status::text IN ('tasdiqlangan', 'tayyorlanmoqda', 'tayyor', 'yetkazilmoqda', 'yetkazildi')
+        """
+    )
     result = {
         "total_orders": await db.fetchval("SELECT COUNT(*) FROM orders"),
-        "pending_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status = 'kutilmoqda'"),
-        "approved_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status = 'tasdiqlangan'"),
-        "preparing_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status = 'tayyorlanmoqda'"),
-        "ready_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status = 'tayyor'"),
-        "delivering_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status = 'yetkazilmoqda'"),
-        "delivered_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status = 'yetkazildi'"),
-        "rejected_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status = 'rad_etilgan'"),
-        "total_dealers": await db.fetchval("SELECT COUNT(*) FROM users WHERE role = 'dealer'"),
-        "total_workers": await db.fetchval("SELECT COUNT(*) FROM users WHERE role = 'worker'"),
+        "pending_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status::text = 'kutilmoqda'"),
+        "approved_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status::text = 'tasdiqlangan'"),
+        "preparing_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status::text = 'tayyorlanmoqda'"),
+        "ready_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status::text = 'tayyor'"),
+        "delivering_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status::text = 'yetkazilmoqda'"),
+        "delivered_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status::text = 'yetkazildi'"),
+        "rejected_orders": await db.fetchval("SELECT COUNT(*) FROM orders WHERE status::text = 'rad_etilgan'"),
+        "total_dealers": await db.fetchval(f"SELECT COUNT(*) FROM {people_table} WHERE role::text = 'dealer'") if people_table else 0,
+        "total_workers": await db.fetchval(f"SELECT COUNT(*) FROM {people_table} WHERE role::text = 'worker'") if people_table else 0,
         "total_materials": await db.fetchval("SELECT COUNT(*) FROM materials"),
         "total_revenue": round(float(total_revenue), 2),
     }
@@ -1205,27 +1728,46 @@ async def get_reports(admin: dict = Depends(require_admin)):
     month_ago = (now - timedelta(days=30)).isoformat()
 
     weekly_revenue = await db.fetchval(
-        "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND status NOT IN ('rad_etilgan')", week_ago
+        "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND status::text NOT IN ('rad_etilgan')", week_ago
     )
     monthly_revenue = await db.fetchval(
-        "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND status NOT IN ('rad_etilgan')", month_ago
+        "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND status::text NOT IN ('rad_etilgan')", month_ago
     )
     total_revenue = await db.fetchval(
-        "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE status NOT IN ('rad_etilgan')"
+        "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE status::text NOT IN ('rad_etilgan')"
     )
     weekly_orders = await db.fetchval("SELECT COUNT(*) FROM orders WHERE created_at >= $1", week_ago)
     monthly_orders = await db.fetchval("SELECT COUNT(*) FROM orders WHERE created_at >= $1", month_ago)
     total_orders = await db.fetchval("SELECT COUNT(*) FROM orders")
 
     # Top selling materials (from order items)
-    all_orders = await db.fetch("SELECT items FROM orders WHERE status NOT IN ('rad_etilgan')")
     mat_stats: dict = {}
-    for row in all_orders:
-        items = json.loads(row["items"]) if isinstance(row["items"], str) else row["items"]
-        for it in items:
-            name = it.get("material_name", "Noma'lum")
-            sqm = it.get("sqm", 0)
-            price = it.get("price", 0)
+    if await column_exists(db, "orders", "items"):
+        all_orders = await db.fetch("SELECT items FROM orders WHERE status::text NOT IN ('rad_etilgan')")
+        for row in all_orders:
+            items = parse_json_field(row["items"], default=[]) or []
+            for it in items:
+                name = it.get("material_name", "Noma'lum")
+                sqm = float(it.get("sqm", 0) or 0)
+                price = float(it.get("price", it.get("total_price", 0)) or 0)
+                if name not in mat_stats:
+                    mat_stats[name] = {"name": name, "total_sqm": 0, "total_price": 0, "count": 0}
+                mat_stats[name]["total_sqm"] += sqm
+                mat_stats[name]["total_price"] += price
+                mat_stats[name]["count"] += 1
+    elif await table_exists(db, "order_items"):
+        item_rows = await db.fetch(
+            """
+            SELECT oi.material_name, oi.sqm, oi.total_price
+            FROM order_items oi
+            JOIN orders o ON oi.order_id::text = o.id::text
+            WHERE o.status::text NOT IN ('rad_etilgan')
+            """
+        )
+        for row in item_rows:
+            name = row.get("material_name") or "Noma'lum"
+            sqm = float(row.get("sqm") or 0)
+            price = float(row.get("total_price") or 0)
             if name not in mat_stats:
                 mat_stats[name] = {"name": name, "total_sqm": 0, "total_price": 0, "count": 0}
             mat_stats[name]["total_sqm"] += sqm
@@ -1235,13 +1777,25 @@ async def get_reports(admin: dict = Depends(require_admin)):
     top_materials = sorted(mat_stats.values(), key=lambda x: x["total_price"], reverse=True)[:5]
 
     # Top dealers
-    dealer_rows = await db.fetch("""
-        SELECT u.name, COUNT(o.id) as order_count, COALESCE(SUM(o.total_price), 0) as revenue
-        FROM orders o JOIN users u ON o.dealer_id = u.id
-        WHERE o.status NOT IN ('rad_etilgan')
-        GROUP BY u.name ORDER BY revenue DESC LIMIT 5
-    """)
-    top_dealers = [{"name": r["name"], "orders": r["order_count"], "revenue": round(float(r["revenue"]), 2)} for r in dealer_rows]
+    dealer_rows = await db.fetch(
+        """
+        SELECT dealer_id::text AS dealer_id, COUNT(id) AS order_count, COALESCE(SUM(total_price), 0) AS revenue
+        FROM orders
+        WHERE status::text NOT IN ('rad_etilgan')
+        GROUP BY dealer_id::text
+        ORDER BY revenue DESC
+        LIMIT 5
+        """
+    )
+    dealer_name_map = await load_user_name_map(db, [str(row["dealer_id"]) for row in dealer_rows])
+    top_dealers = [
+        {
+            "name": dealer_name_map.get(str(row["dealer_id"]), "Diler"),
+            "orders": int(row["order_count"] or 0),
+            "revenue": round(float(row["revenue"] or 0), 2),
+        }
+        for row in dealer_rows
+    ]
 
     # Daily orders for last 7 days
     daily = []
@@ -1249,7 +1803,7 @@ async def get_reports(admin: dict = Depends(require_admin)):
         day_start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0).isoformat()
         day_end = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59).isoformat()
         cnt = await db.fetchval("SELECT COUNT(*) FROM orders WHERE created_at >= $1 AND created_at <= $2", day_start, day_end)
-        rev = await db.fetchval("SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND created_at <= $2 AND status NOT IN ('rad_etilgan')", day_start, day_end)
+        rev = await db.fetchval("SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND created_at <= $2 AND status::text NOT IN ('rad_etilgan')", day_start, day_end)
         day_label = (now - timedelta(days=i)).strftime("%d.%m")
         daily.append({"day": day_label, "orders": cnt, "revenue": round(float(rev), 2)})
 
@@ -1273,6 +1827,9 @@ async def get_low_stock(admin: dict = Depends(require_admin)):
     cached = cache.get("alerts_low_stock")
     if cached: return cached
     db = await get_pool()
+    if not await column_exists(db, "materials", "stock_quantity"):
+        cache.set("alerts_low_stock", [], 60)
+        return []
     rows = await db.fetch("SELECT * FROM materials WHERE stock_quantity < 10 ORDER BY stock_quantity ASC")
     out = []
     for r in rows:
@@ -1286,7 +1843,8 @@ async def get_low_stock(admin: dict = Depends(require_admin)):
 @api_router.get("/reports/export-orders")
 async def export_orders_excel(admin: dict = Depends(require_admin)):
     db = await get_pool()
-    orders = await db.fetch("SELECT * FROM orders ORDER BY created_at DESC")
+    order_rows = await db.fetch("SELECT * FROM orders ORDER BY created_at DESC")
+    orders = await serialize_orders(db, order_rows)
 
     wb = Workbook()
     ws = wb.active
@@ -1311,7 +1869,7 @@ async def export_orders_excel(admin: dict = Depends(require_admin)):
         cell.border = border
 
     for idx, order in enumerate(orders, 1):
-        items = parse_json_field(order["items"], default=[]) or []
+        items = order.get("items") or []
         item_names = ", ".join([
             f'{it.get("material_name", "")} ({it.get("width", 0)}x{it.get("height", 0)}m, {it.get("sqm", 0)} kv.m)'
             for it in items
@@ -1321,12 +1879,12 @@ async def export_orders_excel(admin: dict = Depends(require_admin)):
         row = [
             idx,
             order["order_code"],
-            order["dealer_name"],
+            order.get("dealer_name", ""),
             item_names,
-            round_money(order["total_sqm"]),
-            round_money(order["total_price"]),
-            status_map.get(order["status"], order["status"]),
-            format_export_datetime(order["created_at"]),
+            round_money(order.get("total_sqm", 0)),
+            round_money(order.get("total_price", 0)),
+            status_map.get(order.get("status", ""), order.get("status", "")),
+            format_export_datetime(order.get("created_at")),
         ]
         for col, val in enumerate(row, 1):
             cell = ws.cell(row=idx+1, column=col, value=val)

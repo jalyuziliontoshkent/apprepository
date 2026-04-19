@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { CheckCircle2, ClipboardList } from 'lucide-react-native';
 import { useTheme } from '../../src/utils/theme';
@@ -10,7 +10,7 @@ const icons = {
 };
 
 function renderIcon(name: keyof typeof icons, color: string) {
-  const Icon = icons[name];
+  const Icon = icons[name] ?? ClipboardList;
   return <Icon size={20} color={color} strokeWidth={2.2} />;
 }
 
@@ -22,18 +22,29 @@ export default function WorkerLayout() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarHideOnKeyboard: true,
-        tabBarStyle: [styles.tabBar, { borderColor: c.tabBorder }],
+        tabBarStyle: [styles.tabBar, { borderTopColor: c.tabBorder }],
+        sceneStyle: { backgroundColor: c.bg },
         tabBarItemStyle: styles.tabItem,
-        tabBarActiveTintColor: '#FFFFFF',
+        tabBarActiveTintColor: c.accent,
         tabBarInactiveTintColor: c.textSec,
-        tabBarActiveBackgroundColor: c.accent,
+        tabBarActiveBackgroundColor: 'transparent',
         tabBarLabelStyle: styles.tabLabel,
         tabBarBackground: () => (
-          <BlurView
-            intensity={40}
-            tint={c.statusBar === 'light' ? 'dark' : 'light'}
-            style={StyleSheet.absoluteFill}
-          />
+          Platform.OS === 'web' ? (
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.webTabBackground,
+                { backgroundColor: c.tabBg, borderTopColor: c.tabBorder },
+              ]}
+            />
+          ) : (
+            <BlurView
+              intensity={55}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+            />
+          )
         ),
         tabBarIcon: ({ color }) => renderIcon(route.name as keyof typeof icons, color),
       })}
@@ -47,25 +58,29 @@ export default function WorkerLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    left: 22,
-    right: 22,
-    bottom: 14,
-    height: 72,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 74,
     borderTopWidth: 1,
-    borderRadius: 28,
-    paddingTop: 9,
-    paddingBottom: 9,
-    paddingHorizontal: 8,
+    borderRadius: 0,
+    paddingTop: 8,
+    paddingBottom: 8,
+    paddingHorizontal: 6,
     overflow: 'hidden',
     backgroundColor: 'transparent',
   },
   tabItem: {
-    borderRadius: 22,
-    marginHorizontal: 4,
+    borderRadius: 18,
+    marginHorizontal: 2,
+    paddingHorizontal: 4,
   },
   tabLabel: {
     fontSize: 10,
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: 0,
+  },
+  webTabBackground: {
+    borderTopWidth: 1,
   },
 });

@@ -12,8 +12,11 @@
     "typecheck": "tsc --noEmit",
     "smoke": "npm run lint && npm run typecheck",
     "release:check": "npm run smoke",
-    "eas:android": "eas build --platform android --profile preview",
-    "eas:android:prod": "eas build --platform android --profile production"
+    "eas:android": "node ./scripts/run-eas-build.js android preview",
+    "eas:android:prod": "node ./scripts/run-eas-build.js android production",
+    "eas:ios:register-device": "eas device:create",
+    "eas:ios:dev": "node ./scripts/run-eas-build.js ios ios-device",
+    "eas:ios:preview": "node ./scripts/run-eas-build.js ios ios-preview"
   },
   "dependencies": {
     "@babel/runtime": "^7.20.6",

@@ -100,6 +100,7 @@ const executeRequest = async (
       return text ? JSON.parse(text) : null;
 
     } catch (raw: any) {
+      const rawMessage = typeof raw?.message === 'string' ? raw.message.toLowerCase() : '';
       const normalized: ApiError =
         raw?.name === 'AbortError'
           ? new ApiError(
@@ -108,6 +109,11 @@ const executeRequest = async (
             )
           : raw instanceof ApiError
           ? raw
+          : rawMessage.includes('failed to fetch') || rawMessage.includes('network request failed') || rawMessage.includes('load failed')
+          ? new ApiError(
+              "Serverga ulanishda xatolik. Backend javobi yoki CORS sozlamasini tekshiring.",
+              'NETWORK',
+            )
           : new ApiError(
               raw?.message || "Serverga ulanib bo'lmadi.",
               'NETWORK',

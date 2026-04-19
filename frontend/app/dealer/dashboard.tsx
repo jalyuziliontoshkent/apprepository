@@ -2,18 +2,23 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { CreditCard, LogOut, MessageCircle, Package, ShoppingBag } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { CreditCard, LogOut, MessageCircle, Package, ShoppingBag, Moon, Sun, DollarSign, Wallet } from 'lucide-react-native';
 import { api } from '../../src/services/apiClient';
 import { SectionCard } from '../../src/components/SectionCard';
 import { StateView } from '../../src/components/StateView';
 import { useAuthStore } from '../../src/store/useAuthStore';
+import { useAppStore } from '../../src/utils/store';
 import { getStatusColor, statusLabels, useCurrency, useTheme } from '../../src/utils/theme';
 
 export default function DealerDashboard() {
   const c = useTheme();
   const s = useMemo(() => createStyles(c), [c]);
-  const { formatPrice } = useCurrency();
+  const { currency, formatPrice } = useCurrency();
   const user = useAuthStore((state) => state.user);
+  const theme = useAppStore((state) => state.theme);
+  const toggleTheme = useAppStore((state) => state.toggleTheme);
+  const toggleCurrency = useAppStore((state) => state.toggleCurrency);
   const logout = useAuthStore((state) => state.logout);
   const router = useRouter();
 
@@ -26,9 +31,10 @@ export default function DealerDashboard() {
     try {
       setError('');
       const data = await api('/orders', { cacheKey: 'dealer-orders-dashboard', cacheTtlMs: 15000 });
-      setOrders(data);
+      setOrders(Array.isArray(data) ? data : []);
     } catch (err: any) {
       setError(err?.message || 'Buyurtmalar yuklanmadi');
+      setOrders([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -60,14 +66,28 @@ export default function DealerDashboard() {
 
   return (
     <SafeAreaView style={s.container}>
+      <View style={s.backgroundAccent} pointerEvents="none">
+        <LinearGradient colors={['rgba(255,69,58,0.18)', 'transparent']} style={s.backgroundGlowPrimary} />
+        <LinearGradient colors={['rgba(77,163,255,0.14)', 'transparent']} style={s.backgroundGlowSecondary} />
+      </View>
+
       <View style={s.header}>
-        <View>
+        <View style={s.headerTextWrap}>
           <Text style={s.eyebrow}>Xush kelibsiz</Text>
           <Text style={s.title}>{user?.name || 'Diler'}</Text>
+          <Text style={s.subtitle}>Yangi buyurtmalar, qarzdorlik va statuslarni bitta soddalashtirilgan oynadan boshqaring.</Text>
         </View>
-        <TouchableOpacity style={s.iconButton} onPress={handleLogout}>
-          <LogOut size={20} color={c.text} />
-        </TouchableOpacity>
+        <View style={s.headerControls}>
+          <TouchableOpacity style={s.iconButton} onPress={() => void toggleTheme()}>
+            {theme === 'dark' ? <Sun size={20} color={c.text} /> : <Moon size={20} color={c.text} />}
+          </TouchableOpacity>
+          <TouchableOpacity style={s.iconButton} onPress={() => void toggleCurrency()}>
+            {currency === 'USD' ? <DollarSign size={20} color={c.success} /> : <Wallet size={20} color={c.primary} />}
+          </TouchableOpacity>
+          <TouchableOpacity style={s.iconButton} onPress={handleLogout}>
+            <LogOut size={20} color={c.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -75,6 +95,8 @@ export default function DealerDashboard() {
         contentContainerStyle={s.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} tintColor={c.text} />}
       >
+
+
         <SectionCard style={s.hero}>
           <Text style={s.heroLabel}>Hisob holati</Text>
           <Text style={s.heroValue}>{formatPrice(user?.credit_limit || 0)}</Text>
@@ -159,15 +181,38 @@ export default function DealerDashboard() {
 
 const createStyles = (c: ReturnType<typeof useTheme>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
+  backgroundAccent: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  backgroundGlowPrimary: {
+    position: 'absolute',
+    top: -120,
+    left: -90,
+    width: 320,
+    height: 320,
+    borderRadius: 320,
+  },
+  backgroundGlowSecondary: {
+    position: 'absolute',
+    right: -120,
+    top: 120,
+    width: 280,
+    height: 280,
+    borderRadius: 280,
+  },
   centered: { flex: 1, paddingHorizontal: 22, justifyContent: 'center' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 22,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingTop: 12,
+    paddingBottom: 12,
+    gap: 16,
   },
+  headerTextWrap: { flex: 1 },
+  headerControls: { flexDirection: 'row', gap: 8 },
   eyebrow: {
     fontSize: 12,
     fontWeight: '700',
@@ -176,15 +221,22 @@ const createStyles = (c: ReturnType<typeof useTheme>) => StyleSheet.create({
     letterSpacing: 1.2,
   },
   title: { fontSize: 32, fontWeight: '900', color: c.text, marginTop: 4 },
+  subtitle: { fontSize: 14, color: c.textSec, marginTop: 8, lineHeight: 21, maxWidth: 320 },
   iconButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: c.card,
     borderWidth: 1,
     borderColor: c.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   scroll: { paddingHorizontal: 22, paddingBottom: 110, gap: 14 },
   hero: { padding: 22 },

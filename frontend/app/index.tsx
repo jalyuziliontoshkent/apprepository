@@ -1,37 +1,33 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Animated,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import { Mail, Lock, AlertCircle } from 'lucide-react-native';
+import { ArrowRight, Lock, Mail } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { Input } from '../src/components/Input';
 import { Button } from '../src/components/Button';
-import { useAuthStore } from '../src/store/useAuthStore';
+import { Input } from '../src/components/Input';
 import { AuthService } from '../src/modules/auth/AuthService';
+import { useAuthStore } from '../src/store/useAuthStore';
 import { useTheme } from '../src/utils/theme';
-import { useAppStore } from '../src/utils/store';
-import { typography, spacing, radius } from '../src/theme/theme';
 
 export default function LoginScreen() {
-  const isWeb = Platform.OS === 'web';
-  const router   = useRouter();
-  const c        = useTheme();
-  const theme    = useAppStore((s) => s.theme);
+  const router = useRouter();
+  const c = useTheme();
   const { user, token, isLoading } = useAuthStore();
 
-  const [email,    setEmail]    = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const navigateAfterLogin = useCallback((role: 'admin' | 'worker' | 'dealer') => {
     const destination =
@@ -41,251 +37,258 @@ export default function LoginScreen() {
           ? '/worker/tasks'
           : '/dealer/dashboard';
 
-    if (typeof window !== 'undefined') {
-      window.location.replace(destination);
-      return;
-    }
-
     router.replace(destination as any);
   }, [router]);
 
-  // Animated shake for error
-  const shakeAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim  = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
-
   useEffect(() => {
-    if (isWeb) {
+    if (isLoading || !user || !token) {
       return;
     }
 
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-  }, [fadeAnim, isWeb]);
-
-  // Redirect once auth state is resolved
-  useEffect(() => {
-    if (isLoading || !user || !token) return;
     navigateAfterLogin(user.role);
-  }, [user, token, isLoading, navigateAfterLogin]);
-
-  const triggerShake = useCallback(() => {
-    shakeAnim.setValue(0);
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10,  duration: 60, useNativeDriver: !isWeb }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: !isWeb }),
-      Animated.timing(shakeAnim, { toValue: 8,  duration: 60, useNativeDriver: !isWeb }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: !isWeb }),
-      Animated.timing(shakeAnim, { toValue: 0,  duration: 60, useNativeDriver: !isWeb }),
-    ]).start();
-  }, [isWeb, shakeAnim]);
+  }, [isLoading, navigateAfterLogin, token, user]);
 
   const handleLogin = useCallback(async () => {
-    const trimmedEmail    = email.trim().toLowerCase();
+    const trimmedEmail = email.trim().toLowerCase();
     const trimmedPassword = password.trim();
 
     if (!trimmedEmail || !trimmedPassword) {
       setError('Email va parolni kiriting.');
-      triggerShake();
       return;
     }
+
     if (!trimmedEmail.includes('@')) {
-      setError('To\'g\'ri email kiriting.');
-      triggerShake();
+      setError("To'g'ri email kiriting.");
       return;
     }
 
     setLoading(true);
     setError('');
 
-    console.log('[Login] Attempting login for:', trimmedEmail);
-
     try {
       const loggedInUser = await AuthService.login(trimmedEmail, trimmedPassword);
-      console.log('[Login] Success, user role:', loggedInUser.role);
       navigateAfterLogin(loggedInUser.role);
     } catch (e: any) {
-      console.error('[Login] Error:', e);
-      let msg = 'Xatolik yuz berdi. Qayta urinib ko\'ring.';
-      
+      let msg = "Xatolik yuz berdi. Qayta urinib ko'ring.";
+
       if (e?.message === 'Invalid login credentials' || e?.message === "Email yoki parol noto'g'ri") {
-        msg = 'Email yoki parol noto\'g\'ri.';
+        msg = "Email yoki parol noto'g'ri.";
       } else if (e?.code === 'NETWORK' || e?.message?.includes('Backend URL')) {
-        msg = 'Serverga ulanishda xatolik. Iltimos, internet ulanishingizni tekshiring.';
+        msg = 'Serverga ulanishda xatolik.';
       } else if (e?.message) {
         msg = e.message;
       }
-      
+
       setError(msg);
-      triggerShake();
     } finally {
       setLoading(false);
     }
-  }, [email, navigateAfterLogin, password, triggerShake]);
+  }, [email, navigateAfterLogin, password]);
 
-  // Show spinner during initial session restoration
   if (isLoading) {
     return (
-      <SafeAreaView style={[s.root, { backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' }]}>
-        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-        <Text style={{ color: c.textSec }}>Yuklanmoqda...</Text>
+      <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]}>
+        <StatusBar style="light" />
+        <View style={styles.loadingWrap}>
+          <Text style={[styles.loadingText, { color: c.textSec }]}>Yuklanmoqda...</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[s.root, { backgroundColor: c.bg }]}>
-      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+    <SafeAreaView style={[styles.root, { backgroundColor: c.bg }]}>
+      <StatusBar style="light" />
 
-      {/* Background gradient accent */}
-      <View style={[s.bgAccent, s.noPointerEvents]}>
+      <LinearGradient
+        colors={['#050608', '#06070B', '#090A12']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <View pointerEvents="none" style={styles.backgroundLayer}>
         <LinearGradient
-          colors={['rgba(108,99,255,0.18)', 'transparent']}
-          style={s.bgGrad}
+          colors={['rgba(108,99,255,0.22)', 'rgba(108,99,255,0)']}
+          style={styles.glowTop}
+        />
+        <LinearGradient
+          colors={['rgba(89,162,255,0.12)', 'rgba(89,162,255,0)']}
+          style={styles.glowBottom}
         />
       </View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={s.kav}
+        style={styles.flex}
       >
-        <Animated.View style={[s.content, { opacity: fadeAnim }]}>
-
-          {/* Logo / Brand */}
-          <View style={s.brand}>
-            <View style={[s.logoBox, { backgroundColor: '#000000' }]}>
-              <Image
-                source={require('../assets/images/lion-blinds-logo.jpg')}
-                style={s.logoImage}
-                contentFit="contain"
-              />
-            </View>
-          </View>
-
-          {/* Heading */}
-          <View style={s.heading}>
-            <Text style={[s.title, { color: c.text }]}>Xush kelibsiz</Text>
-            <Text style={[s.subtitle, { color: c.textSec }]}>
-              Ishni boshlash uchun akkauntingizga kiring
-            </Text>
-          </View>
-
-          {/* Form */}
-          <Animated.View
-            style={[s.form, { transform: [{ translateX: shakeAnim }] }]}
-          >
-            {error ? (
-              <View style={[s.errorBox, { backgroundColor: c.dangerSoft, borderColor: c.danger + '30' }]}>
-                <AlertCircle size={16} color={c.danger} />
-                <Text style={[s.errorText, { color: c.danger }]}>{error}</Text>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.content}>
+            <View style={styles.logoWrap}>
+              <View style={[styles.logoFrame, { borderColor: c.cardBorder, backgroundColor: '#08090E' }]}>
+                <Image
+                  source={require('../assets/images/lion-blinds-logo.jpg')}
+                  style={styles.logo}
+                  contentFit="contain"
+                />
               </View>
-            ) : null}
+              <Text style={[styles.brandTitle, { color: c.text }]}>Lion Blinds</Text>
+              <Text style={[styles.brandSubtitle, { color: c.textTer }]}>
+                Pardalar boshqaruv paneli
+              </Text>
+            </View>
 
-            <Input
-              label="Elektron pochta"
-              placeholder="admin@curtain.uz"
-              hint="Masalan: admin@curtain.uz"
-              value={email}
-              onChangeText={(t) => { setEmail(t); setError(''); }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="next"
-              leftIcon={<Mail size={18} color={c.textTer} />}
-              error={error && !email.trim() ? ' ' : undefined}
-            />
+            <View style={styles.formWrap}>
+              <Input
+                label=""
+                placeholder="Email"
+                value={email}
+                onChangeText={(value) => {
+                  setEmail(value);
+                  setError('');
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="next"
+                leftIcon={<Mail size={18} color={c.textTer} />}
+              />
 
-            <Input
-              label="Parol"
-              placeholder="Parolingizni kiriting"
-              value={password}
-              onChangeText={(t) => { setPassword(t); setError(''); }}
-              secureTextEntry
-              returnKeyType="done"
-              onSubmitEditing={handleLogin}
-              leftIcon={<Lock size={18} color={c.textTer} />}
-              error={error && !password.trim() ? ' ' : undefined}
-            />
+              <Input
+                label=""
+                placeholder="Parol"
+                value={password}
+                onChangeText={(value) => {
+                  setPassword(value);
+                  setError('');
+                }}
+                secureTextEntry
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
+                leftIcon={<Lock size={18} color={c.textTer} />}
+              />
 
-            <View style={s.btnWrap}>
+              {error ? (
+                <Text style={[styles.errorText, { color: c.danger }]}>{error}</Text>
+              ) : null}
+
               <Button
-                title={loading ? '' : 'Tizimga kirish'}
+                title={loading ? '' : 'Kirish'}
                 loading={loading}
                 onPress={handleLogin}
                 size="lg"
+                rightIcon={<ArrowRight size={18} color="#FFFFFF" />}
+                style={styles.loginButton}
               />
             </View>
-          </Animated.View>
 
-        </Animated.View>
+            <Text style={[styles.helper, { color: c.textTer }]}>
+              Admin, diler va ishchi uchun yagona kirish oynasi
+            </Text>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const s = StyleSheet.create({
-  root:     { flex: 1 },
-  splash:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  kav:      { flex: 1, justifyContent: 'center' },
-  bgAccent: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
-  bgGrad:   { width: '100%', height: 400, borderRadius: 300, transform: [{ translateY: -200 }] },
-  content:  { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl },
-  noPointerEvents: {
-    pointerEvents: 'none',
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
   },
-
-  brand: {
-    alignItems: 'center',
-    marginBottom: spacing.xxl,
-    gap: spacing.sm,
+  flex: {
+    flex: 1,
   },
-  logoBox: {
-    width: 240,
-    height: 140,
-    borderRadius: radius.lg,
+  backgroundLayer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  glowTop: {
+    position: 'absolute',
+    top: -160,
+    left: -60,
+    width: 360,
+    height: 360,
+    borderRadius: 360,
+  },
+  glowBottom: {
+    position: 'absolute',
+    right: -110,
+    bottom: -120,
+    width: 340,
+    height: 340,
+    borderRadius: 340,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingVertical: 36,
+  },
+  content: {
+    gap: 26,
+  },
+  logoWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-    paddingHorizontal: spacing.md,
+    gap: 10,
+    minHeight: 220,
   },
-  logoImage: {
-    width: '100%',
-    height: '100%',
-  },
-
-  heading: {
-    marginBottom: spacing.xl + spacing.xs,
-    alignItems: 'center',
-  },
-  title: {
-    ...typography.h1,
-    textAlign: 'center',
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    ...typography.body1,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-
-  form:   { width: '100%' },
-  btnWrap: { marginTop: spacing.md },
-
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+  logoFrame: {
+    width: 108,
+    height: 108,
+    borderRadius: 28,
     borderWidth: 1,
-    borderRadius: radius.sm,
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6C63FF',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.22,
+    shadowRadius: 28,
+    elevation: 10,
+  },
+  logo: {
+    width: 84,
+    height: 84,
+  },
+  brandTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  brandSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  formWrap: {
+    gap: 6,
   },
   errorText: {
-    ...typography.body2,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: -4,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  loginButton: {
+    marginTop: 4,
+  },
+  helper: {
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  loadingWrap: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 15,
     fontWeight: '500',
   },
 });

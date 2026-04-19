@@ -123,7 +123,7 @@ export default function DealerChat() {
             multiline
           />
           <TouchableOpacity testID="dealer-chat-send-btn" style={styles.sendBtn} onPress={sendMessage}>
-            <Send size={20} color="#000" />
+            <Send size={20} color="#fff" />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -134,44 +134,45 @@ export default function DealerChat() {
 const createStyles = (c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
   chatHeader: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)', gap: 14,
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: c.cardBorder, gap: 14,
+    backgroundColor: '#0C0E14',
   },
   chatAvatar: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(108,99,255,0.16)',
     alignItems: 'center', justifyContent: 'center',
   },
-  chatAvatarText: { fontSize: 18, fontWeight: '600', color: '#fff' },
-  chatHeaderName: { fontSize: 16, fontWeight: '500', color: '#fff' },
-  chatHeaderSub: { fontSize: 12, color: 'rgba(255,255,255,0.4)' },
+  chatAvatarText: { fontSize: 18, fontWeight: '700', color: c.accent },
+  chatHeaderName: { fontSize: 16, fontWeight: '700', color: c.text },
+  chatHeaderSub: { fontSize: 12, color: c.textTer },
   messagesArea: { flex: 1 },
-  messagesContent: { padding: 16, gap: 8 },
+  messagesContent: { padding: 16, gap: 10, paddingBottom: 24 },
   emptyChat: { alignItems: 'center', paddingTop: 80 },
-  emptyChatText: { fontSize: 16, color: 'rgba(255,255,255,0.3)' },
+  emptyChatText: { fontSize: 16, color: c.textTer },
   bubble: { maxWidth: '80%', borderRadius: 20, padding: 12, paddingBottom: 6 },
-  bubbleSent: { alignSelf: 'flex-end', backgroundColor: '#fff', borderBottomRightRadius: 4 },
+  bubbleSent: { alignSelf: 'flex-end', backgroundColor: c.accent, borderBottomRightRadius: 4 },
   bubbleReceived: {
-    alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderBottomLeftRadius: 4,
+    alignSelf: 'flex-start', backgroundColor: '#11141C',
+    borderWidth: 1, borderColor: c.cardBorder, borderBottomLeftRadius: 4,
   },
   bubbleText: { fontSize: 15, lineHeight: 20 },
-  bubbleTextSent: { color: '#000' },
-  bubbleTextReceived: { color: '#fff' },
+  bubbleTextSent: { color: '#FFFFFF' },
+  bubbleTextReceived: { color: c.text },
   bubbleTime: { fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
-  bubbleTimeSent: { color: 'rgba(0,0,0,0.4)' },
-  bubbleTimeReceived: { color: 'rgba(255,255,255,0.3)' },
+  bubbleTimeSent: { color: 'rgba(255,255,255,0.72)' },
+  bubbleTimeReceived: { color: c.textTer },
   inputArea: {
     flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, paddingVertical: 12,
-    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', gap: 10,
-    backgroundColor: 'rgba(5,5,5,0.9)',
+    borderTopWidth: 1, borderTopColor: c.cardBorder, gap: 10,
+    backgroundColor: '#0C0E14',
   },
   chatInput: {
-    flex: 1, minHeight: 44, maxHeight: 100, backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 18, paddingVertical: 10, fontSize: 15, color: '#fff',
+    flex: 1, minHeight: 46, maxHeight: 100, backgroundColor: '#11141C',
+    borderRadius: 22, borderWidth: 1, borderColor: c.cardBorder,
+    paddingHorizontal: 18, paddingVertical: 10, fontSize: 15, color: c.text,
   },
   sendBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff',
+    width: 46, height: 46, borderRadius: 23, backgroundColor: c.accent,
     alignItems: 'center', justifyContent: 'center',
   },
 });
