@@ -167,9 +167,20 @@ async def get_pool() -> asyncpg.Pool:
     return pool
 
 # ─── Helpers ───
-def get_jwt_secret(): return os.environ["JWT_SECRET"]
+def get_jwt_secret():
+    secret = os.environ.get("JWT_SECRET", "").strip()
+    if not secret:
+        raise RuntimeError("JWT_SECRET is not configured")
+    return secret
 def hash_password(pw: str) -> str: return bcrypt.hashpw(pw.encode(), bcrypt.gensalt(4)).decode()
-def verify_password(plain: str, hashed: str) -> bool: return bcrypt.checkpw(plain.encode(), hashed.encode())
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        if not plain or not hashed:
+            return False
+        return bcrypt.checkpw(plain.encode(), hashed.encode())
+    except (TypeError, ValueError):
+        logger.warning("Invalid password hash encountered during login")
+        return False
 
 def create_access_token(uid: str, email: str, role: str) -> str:
     return jwt.encode({"sub": uid, "email": email, "role": role, "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "access"}, get_jwt_secret(), algorithm=JWT_ALGORITHM)
@@ -792,7 +803,7 @@ async def require_worker(request: Request) -> dict:
     return u
 
 # ─── Pydantic Models ───
-class LoginReq(BaseModel): email: str; password: str
+class LoginReq(BaseModel): email: Optional[str] = None; password: Optional[str] = None
 class DealerCreate(BaseModel): name: str; email: str; password: str; phone: str = ""; address: str = ""; credit_limit: float = 0
 class DealerUpdate(BaseModel): name: Optional[str] = None; phone: Optional[str] = None; address: Optional[str] = None; credit_limit: Optional[float] = None
 class WorkerCreate(BaseModel): name: str; email: str; password: str; phone: str = ""; specialty: str = ""
@@ -854,7 +865,7 @@ async def require_worker(request: Request) -> dict:
     return u
 
 # ─── Pydantic Models ───
-class LoginReq(BaseModel): email: str; password: str
+class LoginReq(BaseModel): email: Optional[str] = None; password: Optional[str] = None
 class DealerCreate(BaseModel): name: str; email: str; password: str; phone: str = ""; address: str = ""; credit_limit: float = 0
 class DealerUpdate(BaseModel): name: Optional[str] = None; phone: Optional[str] = None; address: Optional[str] = None; credit_limit: Optional[float] = None
 class WorkerCreate(BaseModel): name: str; email: str; password: str; phone: str = ""; specialty: str = ""
@@ -896,18 +907,27 @@ async def get_exchange_rate():
 # ─── AUTH ───
 @api_router.post("/auth/login")
 async def login(req: LoginReq):
+    email = (req.email or "").strip().lower()
+    password = req.password or ""
+    if not email or not password:
+        raise HTTPException(400, "Email va parolni kiriting")
+
     db = await get_pool()
-    user = await db.fetchrow("SELECT * FROM users WHERE email = $1", req.email.strip().lower())
+    user = await db.fetchrow("SELECT * FROM users WHERE email = $1", email)
     
     if not user:
         raise HTTPException(401, "Email yoki parol noto'g'ri")
         
     loop = asyncio.get_running_loop()
-    is_valid = await loop.run_in_executor(None, verify_password, req.password, user["password_hash"])
+    is_valid = await loop.run_in_executor(None, verify_password, password, user["password_hash"])
     
     if not is_valid:
         raise HTTPException(401, "Email yoki parol noto'g'ri")
-    token = create_access_token(str(user["id"]), user["email"], user["role"])
+    try:
+        token = create_access_token(str(user["id"]), user["email"], user["role"])
+    except RuntimeError as e:
+        logger.error("Auth configuration error: %s", e)
+        raise HTTPException(500, "Auth service is not configured")
     u = row_to_dict(user)
     u["id"] = str(u["id"])
     u.pop("password_hash", None)

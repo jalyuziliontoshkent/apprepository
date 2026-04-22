@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "Lion Blinds",
-    "slug": "curtain-order-app",
-    "owner": "farrux121212",
+    "slug": "lionapk",
+    "owner": "farruxismoi0v",
     "version": "2.3.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -67,7 +67,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "1f68b97f-5978-44d4-9a81-82cc12d9b93e"
+        "projectId": "944f3920-48b8-46ff-bfce-106a9c62725a"
       },
       "developer": {
         "name": "Lion Blinds Team",

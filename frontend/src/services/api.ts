@@ -120,10 +120,6 @@ const executeRequest = async (
             );
 
       // Handle 401 — clear session and let AuthGuard redirect
-      if (normalized.code === 'UNAUTHORIZED') {
-        await useAuthStore.getState().logout().catch(() => {});
-      }
-
       trackApiFailure(Date.now() - startedAt);
 
       if (shouldRetry(normalized, method, attempt, retries, path)) {

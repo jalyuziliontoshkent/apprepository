@@ -10,17 +10,12 @@ if (!platform || !profile) {
 
 const projectRoot = path.resolve(__dirname, '..');
 const easCommand = process.platform === 'win32' ? 'eas.cmd' : 'eas';
-const env = {
-  ...process.env,
-  EAS_NO_VCS: '1',
-  EAS_PROJECT_ROOT: projectRoot,
-};
 
 const args = ['build', '--platform', platform, '--profile', profile, ...restArgs];
 
 const result = spawnSync(easCommand, args, {
   cwd: projectRoot,
-  env,
+  env: process.env,
   stdio: 'inherit',
 });
 

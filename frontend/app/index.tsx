@@ -24,9 +24,8 @@ export default function LoginScreen() {
 
   const handleLogin = useCallback(async () => {
     const trimmedEmail = email.trim().toLowerCase();
-    const trimmedPassword = password.trim();
 
-    if (!trimmedEmail || !trimmedPassword) {
+    if (!trimmedEmail || !password) {
       setError('Email va parolni kiriting.');
       return;
     }
@@ -39,7 +38,7 @@ export default function LoginScreen() {
     setError('');
 
     try {
-      const user = await AuthService.login(trimmedEmail, trimmedPassword);
+      const user = await AuthService.login(trimmedEmail, password);
       const dest =
         user.role === 'admin'
           ? '/admin/dashboard'

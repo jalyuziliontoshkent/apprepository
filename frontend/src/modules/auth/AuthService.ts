@@ -38,6 +38,9 @@ export const AuthService = {
     } catch (error: any) {
       console.error('[AuthService] Login error:', error?.message || error);
       if (isApiError(error)) {
+        if (error.code === 'UNAUTHORIZED') {
+          throw new ApiError("Email yoki parol noto'g'ri.", 'UNAUTHORIZED', error.status, error.details);
+        }
         throw error;
       }
 
@@ -50,8 +53,8 @@ export const AuthService = {
   },
 
   async refreshSession(): Promise<string | null> {
-    const token = useAuthStore.getState().token;
-    if (!token) {
+    const { token, user } = useAuthStore.getState();
+    if (!token || !user) {
       return null;
     }
 
@@ -66,8 +69,11 @@ export const AuthService = {
     } catch (error) {
       if (isApiError(error) && error.code === 'UNAUTHORIZED') {
         await useAuthStore.getState().clearSession();
+        return null;
       }
-      return null;
+
+      // Network/server hiccups should not immediately throw the user out.
+      return token;
     }
   },
 };

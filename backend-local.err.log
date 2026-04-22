@@ -1,0 +1,6 @@
+INFO:     Started server process [5636]
+INFO:     Waiting for application startup.
+2026-04-22 02:29:35,000 - backend - INFO - Muvaffaqiyat: API tayyor, PostgreSQL ulandi, keep-alive yoqildi (bu xato emas).
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8007 (Press CTRL+C to quit)
+2026-04-22 02:29:38,486 - backend - INFO - request_completed request_id=08ee8f9bdb4a435a9f83abd3c08d10e1 method=GET path=/api/health status=200 duration_ms=552.44
