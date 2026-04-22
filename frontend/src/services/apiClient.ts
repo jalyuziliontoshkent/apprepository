@@ -1,7 +1,7 @@
 import { createApi } from './api';
 
 /** Production API. Telefon buildida lokal URL ishlatilmasin. */
-const FALLBACK_PRODUCTION = 'https://web-production-cabff.up.railway.app';
+const FALLBACK_PRODUCTION = 'https://lion-blinds-backend.onrender.com';
 
 function getEnvBackendUrl(): string | undefined {
   // Try multiple sources for the backend URL

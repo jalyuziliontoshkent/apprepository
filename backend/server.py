@@ -1893,8 +1893,8 @@ async def get_reports(admin: dict = Depends(require_admin)):
     now = datetime.now(timezone.utc)
 
     # Weekly & Monthly revenue
-    week_ago = (now - timedelta(days=7)).isoformat()
-    month_ago = (now - timedelta(days=30)).isoformat()
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
 
     weekly_revenue = await db.fetchval(
         "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND status::text NOT IN ('rad_etilgan')", week_ago
@@ -1969,8 +1969,8 @@ async def get_reports(admin: dict = Depends(require_admin)):
     # Daily orders for last 7 days
     daily = []
     for i in range(6, -1, -1):
-        day_start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0).isoformat()
-        day_end = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59).isoformat()
+        day_start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59, microsecond=999999)
         cnt = await db.fetchval("SELECT COUNT(*) FROM orders WHERE created_at >= $1 AND created_at <= $2", day_start, day_end)
         rev = await db.fetchval("SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND created_at <= $2 AND status::text NOT IN ('rad_etilgan')", day_start, day_end)
         day_label = (now - timedelta(days=i)).strftime("%d.%m")
