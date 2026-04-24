@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,26 +12,34 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { AuthService } from '../src/modules/auth/AuthService';
+import { ApiError } from '../src/services/errors';
 
-export default function LoginScreen() {
+export default function RegisterScreen() {
   const router = useRouter();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = useCallback(async () => {
+  const handleRegister = useCallback(async () => {
+    const trimmedName = name.trim();
     const trimmedEmail = email.trim().toLowerCase();
 
-    if (!trimmedEmail || !password) {
-      setError('Email va parolni kiriting.');
+    if (!trimmedName || !trimmedEmail || !password) {
+      setError("Ism, email va parolni to'ldiring.");
       return;
     }
     if (!trimmedEmail.includes('@')) {
       setError("To'g'ri email kiriting.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Parol kamida 8 ta belgi bo'lishi kerak.");
       return;
     }
 
@@ -38,7 +47,14 @@ export default function LoginScreen() {
     setError('');
 
     try {
-      const user = await AuthService.login(trimmedEmail, password);
+      const user = await AuthService.register({
+        name: trimmedName,
+        email: trimmedEmail,
+        password,
+        phone,
+        address,
+      });
+
       const destination =
         user.role === 'admin'
           ? '/admin/dashboard'
@@ -46,41 +62,42 @@ export default function LoginScreen() {
             ? '/worker/tasks'
             : '/dealer/dashboard';
       router.replace(destination as never);
-    } catch (error: any) {
-      if (error?.message?.includes("noto'g'ri") || error?.message === 'Invalid login credentials') {
-        setError("Email yoki parol noto'g'ri.");
-      } else if (error?.code === 'NETWORK' || error?.message?.includes('ulanib')) {
-        setError('Serverga ulanishda xatolik.');
+    } catch (error: unknown) {
+      if (error instanceof ApiError) {
+        setError(error.message);
       } else {
-        setError(error?.message || "Xatolik yuz berdi. Qayta urinib ko'ring.");
+        setError("Ro'yxatdan o'tishda xatolik yuz berdi.");
       }
     } finally {
       setLoading(false);
     }
-  }, [email, password, router]);
+  }, [address, email, name, password, phone, router]);
 
   return (
     <SafeAreaView style={styles.root}>
       <StatusBar style="light" />
-
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
-        keyboardVerticalOffset={0}
       >
-        <View style={styles.container}>
-          <View style={styles.logoWrap}>
-            <View style={styles.logoBox}>
-              <Image
-                source={require('../assets/images/lion-blinds-logo.jpg')}
-                style={styles.logo}
-                contentFit="contain"
-              />
-            </View>
-            <Text style={styles.brand}>Lion Blinds</Text>
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <Text style={styles.title}>Hisob yaratish</Text>
+            <Text style={styles.subtitle}>Dealer kabinetiga xavfsiz kirish uchun yangi akkaunt oching.</Text>
           </View>
 
           <View style={styles.form}>
+            <TextInput
+              style={styles.input}
+              placeholder="Ism"
+              placeholderTextColor="#666"
+              value={name}
+              onChangeText={(value) => {
+                setName(value);
+                setError('');
+              }}
+              editable={!loading}
+            />
             <TextInput
               style={styles.input}
               placeholder="Email"
@@ -93,10 +110,8 @@ export default function LoginScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
-              returnKeyType="next"
               editable={!loading}
             />
-
             <TextInput
               style={styles.input}
               placeholder="Parol"
@@ -107,8 +122,24 @@ export default function LoginScreen() {
                 setError('');
               }}
               secureTextEntry
-              returnKeyType="done"
-              onSubmitEditing={handleLogin}
+              editable={!loading}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Telefon (ixtiyoriy)"
+              placeholderTextColor="#666"
+              value={phone}
+              onChangeText={setPhone}
+              editable={!loading}
+            />
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Manzil (ixtiyoriy)"
+              placeholderTextColor="#666"
+              value={address}
+              onChangeText={setAddress}
+              multiline
+              numberOfLines={3}
               editable={!loading}
             />
 
@@ -116,18 +147,18 @@ export default function LoginScreen() {
 
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleLogin}
-              activeOpacity={0.85}
+              onPress={handleRegister}
               disabled={loading}
+              activeOpacity={0.85}
             >
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Kirish</Text>}
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Ro'yxatdan o'tish</Text>}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => router.push('/register' as never)} disabled={loading}>
-              <Text style={styles.link}>Yangi akkaunt ochish</Text>
+            <TouchableOpacity onPress={() => router.replace('/' as never)} disabled={loading}>
+              <Text style={styles.link}>Akkauntingiz bormi? Kirish</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -142,33 +173,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
-    gap: 40,
+    paddingVertical: 32,
+    gap: 28,
   },
-  logoWrap: {
-    alignItems: 'center',
-    gap: 12,
+  header: {
+    gap: 10,
   },
-  logoBox: {
-    width: 80,
-    height: 80,
-    borderRadius: 18,
-    backgroundColor: '#111',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  logo: {
-    width: 64,
-    height: 64,
-  },
-  brand: {
+  title: {
     color: '#fff',
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '700',
-    letterSpacing: 0.5,
+  },
+  subtitle: {
+    color: '#9a9a9a',
+    fontSize: 14,
+    lineHeight: 20,
   },
   form: {
     gap: 12,
@@ -183,11 +205,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
   },
+  textArea: {
+    minHeight: 88,
+    textAlignVertical: 'top',
+  },
   error: {
-    color: '#FF453A',
+    color: '#ff6155',
     fontSize: 13,
     fontWeight: '500',
-    paddingHorizontal: 4,
   },
   button: {
     backgroundColor: '#5B4FE8',
@@ -198,13 +223,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.65,
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 0.3,
   },
   link: {
     color: '#b2a7ff',

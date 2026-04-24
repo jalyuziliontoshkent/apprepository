@@ -12,7 +12,7 @@ import { api, warmBackend } from '../src/services/apiClient';
 export { api };
 
 function AuthGuard() {
-  const { user, token, isLoading, isHydrated, initialize } = useAuthStore();
+  const { user, token, refreshToken, isLoading, isHydrated, initialize } = useAuthStore();
   const router = useRouter();
   const segments = useSegments();
   const currentSegment = String(segments[0] ?? '');
@@ -46,7 +46,7 @@ function AuthGuard() {
   // Step 4: Validate session once per token value.
   useEffect(() => {
     if (isLoading || !isHydrated) return;
-    if (!user || !token) {
+    if (!user || !refreshToken) {
       validatedTokenRef.current = null;
       return;
     }
@@ -70,7 +70,7 @@ function AuthGuard() {
     })();
 
     return () => { cancelled = true; };
-  }, [isHydrated, isLoading, token, user]);
+  }, [isHydrated, isLoading, refreshToken, token, user]);
 
   // Step 5: Route guard – runs AFTER validation is done.
   useEffect(() => {
@@ -82,9 +82,9 @@ function AuthGuard() {
       currentSegment === 'worker';
 
     const isLoginPage =
-      currentSegment === 'index' || currentSegment === '';
+      currentSegment === 'index' || currentSegment === '' || currentSegment === 'register';
 
-    if (!user || !token) {
+    if (!user || !refreshToken) {
       if (inProtected) {
         console.log('[AuthGuard] No auth, → login');
         router.replace('/' as never);
@@ -102,7 +102,7 @@ function AuthGuard() {
       console.log('[AuthGuard] Logged in → ', dest);
       router.replace(dest as never);
     }
-  }, [currentSegment, isHydrated, isLoading, isValidating, router, token, user]);
+  }, [currentSegment, isHydrated, isLoading, isValidating, refreshToken, router, token, user]);
 
   return null;
 }
@@ -123,6 +123,7 @@ function RootNavigator() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="register" options={{ headerShown: false }} />
         <Stack.Screen name="admin" options={{ headerShown: false }} />
         <Stack.Screen name="dealer" options={{ headerShown: false }} />
         <Stack.Screen name="worker" options={{ headerShown: false }} />

@@ -2,6 +2,16 @@
 """
 CurtainOrderApp Backend API Testing - PostgreSQL Migration
 Tests all backend endpoints after MongoDB to PostgreSQL migration
+
+Usage:
+  export BACKEND_URL=https://your-backend.onrender.com/api
+  export TEST_ADMIN_EMAIL=admin@example.com
+  export TEST_ADMIN_PASSWORD=yourpassword
+  export TEST_DEALER_EMAIL=dealer@example.com
+  export TEST_DEALER_PASSWORD=yourpassword
+  export TEST_WORKER_EMAIL=worker@example.com
+  export TEST_WORKER_PASSWORD=yourpassword
+  python backend_test.py
 """
 
 import requests
@@ -10,13 +20,22 @@ import sys
 import os
 from io import BytesIO
 
-# Backend URL
-BASE_URL = "https://dealer-dashboard-21.preview.emergentagent.com/api"
+# Backend URL from environment variable
+BASE_URL = os.environ.get("BACKEND_URL", "http://127.0.0.1:8000/api").rstrip("/")
 
-# Test credentials (PostgreSQL uses integer IDs now)
-ADMIN_CREDS = {"email": "admin@curtain.uz", "password": "admin123"}
-DEALER_CREDS = {"email": "dealer@test.uz", "password": "dealer123"}  
-WORKER_CREDS = {"email": "worker@test.uz", "password": "worker123"}
+# Test credentials from environment variables
+ADMIN_CREDS = {
+    "email": os.environ.get("TEST_ADMIN_EMAIL", "admin@test.uz"),
+    "password": os.environ.get("TEST_ADMIN_PASSWORD", "testpass123")
+}
+DEALER_CREDS = {
+    "email": os.environ.get("TEST_DEALER_EMAIL", "dealer@test.uz"),
+    "password": os.environ.get("TEST_DEALER_PASSWORD", "testpass123")
+}
+WORKER_CREDS = {
+    "email": os.environ.get("TEST_WORKER_EMAIL", "worker@test.uz"),
+    "password": os.environ.get("TEST_WORKER_PASSWORD", "testpass123")
+}
 
 class APITester:
     def __init__(self):
@@ -146,8 +165,8 @@ class APITester:
             
         # Test password change
         update_data = {
-            "current_password": "admin123",
-            "password": "admin123"  # Same password to avoid breaking other tests
+            "current_password": ADMIN_CREDS["password"],
+            "password": ADMIN_CREDS["password"]  # Same password to avoid breaking other tests
         }
         
         response = self.make_request("PUT", "/auth/profile", update_data, token=self.admin_token)

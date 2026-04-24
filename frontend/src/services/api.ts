@@ -1,31 +1,43 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  AUTH_ACCESS_TOKEN_KEY,
+  AUTH_REFRESH_TOKEN_KEY,
+  type AuthSessionResponse,
+} from '../modules/auth/contracts';
+import { useAuthStore } from '../store/useAuthStore';
 import { getCache, getStaleCache, setCache } from './cache';
 import { ApiError, mapHttpError } from './errors';
 import { trackApiFailure, trackApiSuccess } from './telemetry';
-import { useAuthStore } from '../store/useAuthStore';
 
-const API_TIMEOUT_MS  = 55_000;
+const API_TIMEOUT_MS = 55_000;
 const DEFAULT_RETRIES = 2;
-const RETRY_BASE_MS   = 800;
+const RETRY_BASE_MS = 800;
 
 type RequestOptions = RequestInit & {
-  timeoutMs?:  number;
-  retries?:    number;
-  dedup?:      boolean;
-  cacheKey?:   string;
+  timeoutMs?: number;
+  retries?: number;
+  dedup?: boolean;
+  cacheKey?: string;
   cacheTtlMs?: number;
+  skipAuthRefresh?: boolean;
 };
 
 const pendingGetRequests = new Map<string, Promise<any>>();
+let refreshInFlight: Promise<string | null> | null = null;
 
 const getAuthToken = async (): Promise<string | null> => {
-  // Prefer zustand in-memory token (fastest path), fallback to AsyncStorage
   const storeToken = useAuthStore.getState().token;
   if (storeToken) return storeToken;
-  return AsyncStorage.getItem('token');
+  return AsyncStorage.getItem(AUTH_ACCESS_TOKEN_KEY);
 };
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const getRefreshToken = async (): Promise<string | null> => {
+  const storeToken = useAuthStore.getState().refreshToken;
+  if (storeToken) return storeToken;
+  return AsyncStorage.getItem(AUTH_REFRESH_TOKEN_KEY);
+};
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const shouldRetry = (
   error: unknown,
@@ -51,18 +63,79 @@ const resolveTimeout = (method: string, path: string, timeoutMs?: number) => {
   return API_TIMEOUT_MS;
 };
 
+const parseJson = async (res: Response): Promise<any> => {
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+};
+
 const parseError = async (res: Response): Promise<ApiError> => {
   const fallback = 'Xatolik yuz berdi';
-  let detail: string = fallback;
+  let detail = fallback;
   try {
-    const text = await res.text();
-    if (text) {
-      const parsed = JSON.parse(text);
-      if (typeof parsed?.detail === 'string') detail = parsed.detail;
-      else if (typeof parsed?.message === 'string') detail = parsed.message;
-    }
-  } catch { /* ignore parse errors */ }
+    const parsed = await parseJson(res);
+    if (typeof parsed?.detail === 'string') detail = parsed.detail;
+    else if (typeof parsed?.message === 'string') detail = parsed.message;
+  } catch {
+    // ignore parse errors
+  }
   return mapHttpError(res.status, detail);
+};
+
+const persistSessionResponse = async (payload: AuthSessionResponse): Promise<string | null> => {
+  if (!payload?.access_token || !payload?.refresh_token || !payload?.user || !payload?.expires_at) {
+    await useAuthStore.getState().clearSession();
+    return null;
+  }
+
+  await useAuthStore.getState().setSession({
+    user: {
+      ...payload.user,
+      id: String(payload.user.id),
+      email: String(payload.user.email ?? '').trim().toLowerCase(),
+      role: (payload.user.role ?? 'dealer') as 'admin' | 'worker' | 'dealer',
+    },
+    token: payload.access_token,
+    refreshToken: payload.refresh_token,
+    accessTokenExpiresAt: payload.expires_at,
+  });
+
+  return payload.access_token;
+};
+
+const refreshAccessToken = async (baseUrl: string): Promise<string | null> => {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    const refreshToken = await getRefreshToken();
+    if (!refreshToken) {
+      await useAuthStore.getState().clearSession();
+      return null;
+    }
+
+    try {
+      const res = await fetch(`${baseUrl}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!res.ok) {
+        await useAuthStore.getState().clearSession();
+        return null;
+      }
+
+      const payload = (await parseJson(res)) as AuthSessionResponse;
+      return await persistSessionResponse(payload);
+    } catch {
+      return useAuthStore.getState().token;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
 };
 
 const executeRequest = async (
@@ -70,13 +143,13 @@ const executeRequest = async (
   path: string,
   options: RequestOptions = {},
 ): Promise<unknown> => {
-  const method  = (options.method || 'GET').toUpperCase();
+  const method = (options.method || 'GET').toUpperCase();
   const retries = options.retries ?? DEFAULT_RETRIES;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const startedAt  = Date.now();
+    const startedAt = Date.now();
     const controller = new AbortController();
-    const timer      = setTimeout(() => controller.abort(), resolveTimeout(method, path, options.timeoutMs));
+    const timer = setTimeout(() => controller.abort(), resolveTimeout(method, path, options.timeoutMs));
 
     try {
       const token = await getAuthToken();
@@ -84,7 +157,7 @@ const executeRequest = async (
         'Content-Type': 'application/json',
         ...(options.headers as Record<string, string>),
       };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (token) headers.Authorization = `Bearer ${token}`;
 
       const res = await fetch(`${baseUrl}/api${path}`, {
         ...options,
@@ -93,12 +166,18 @@ const executeRequest = async (
         signal: controller.signal,
       });
 
-      if (!res.ok) throw await parseError(res);
+      if (!res.ok) {
+        if (res.status === 401 && !options.skipAuthRefresh && !path.startsWith('/auth/')) {
+          const refreshedToken = await refreshAccessToken(baseUrl);
+          if (refreshedToken) {
+            continue;
+          }
+        }
+        throw await parseError(res);
+      }
 
       trackApiSuccess(Date.now() - startedAt);
-      const text = await res.text();
-      return text ? JSON.parse(text) : null;
-
+      return await parseJson(res);
     } catch (raw: any) {
       const rawMessage = typeof raw?.message === 'string' ? raw.message.toLowerCase() : '';
       const normalized: ApiError =
@@ -108,18 +187,14 @@ const executeRequest = async (
               'TIMEOUT',
             )
           : raw instanceof ApiError
-          ? raw
-          : rawMessage.includes('failed to fetch') || rawMessage.includes('network request failed') || rawMessage.includes('load failed')
-          ? new ApiError(
-              "Serverga ulanishda xatolik. Backend javobi yoki CORS sozlamasini tekshiring.",
-              'NETWORK',
-            )
-          : new ApiError(
-              raw?.message || "Serverga ulanib bo'lmadi.",
-              'NETWORK',
-            );
+            ? raw
+            : rawMessage.includes('failed to fetch') || rawMessage.includes('network request failed') || rawMessage.includes('load failed')
+              ? new ApiError(
+                  "Serverga ulanishda xatolik. Backend javobi yoki CORS sozlamasini tekshiring.",
+                  'NETWORK',
+                )
+              : new ApiError(raw?.message || "Serverga ulanib bo'lmadi.", 'NETWORK');
 
-      // Handle 401 — clear session and let AuthGuard redirect
       trackApiFailure(Date.now() - startedAt);
 
       if (shouldRetry(normalized, method, attempt, retries, path)) {
@@ -132,7 +207,6 @@ const executeRequest = async (
     }
   }
 
-  // Unreachable, but satisfies TypeScript
   throw new ApiError('Max retries exceeded', 'NETWORK');
 };
 
@@ -144,18 +218,16 @@ export const createApi = (baseUrl?: string) => {
       throw new ApiError('Backend URL sozlanmagan (EXPO_PUBLIC_BACKEND_URL)', 'NETWORK');
     }
 
-    const method     = (options.method || 'GET').toUpperCase();
-    const isGet      = method === 'GET';
-    const cacheKey   = options.cacheKey;
+    const method = (options.method || 'GET').toUpperCase();
+    const isGet = method === 'GET';
+    const cacheKey = options.cacheKey;
     const cacheTtlMs = options.cacheTtlMs ?? 0;
 
-    // 1. Fresh cache hit
     if (isGet && cacheKey) {
       const cached = await getCache<T>(cacheKey);
       if (cached !== null) return cached;
     }
 
-    // 2. Request deduplication
     const dedupKey = isGet && options.dedup !== false ? `${method}:${path}` : '';
     if (dedupKey && pendingGetRequests.has(dedupKey)) {
       return pendingGetRequests.get(dedupKey) as Promise<T>;
@@ -172,15 +244,14 @@ export const createApi = (baseUrl?: string) => {
 
     try {
       return await reqPromise;
-    } catch (e) {
-      // 3. Stale cache fallback on network/server errors
-      if (isGet && cacheKey && e instanceof ApiError) {
-        if (e.code === 'NETWORK' || e.code === 'TIMEOUT' || e.code === 'SERVER') {
+    } catch (error) {
+      if (isGet && cacheKey && error instanceof ApiError) {
+        if (error.code === 'NETWORK' || error.code === 'TIMEOUT' || error.code === 'SERVER') {
           const stale = await getStaleCache<T>(cacheKey);
           if (stale !== null) return stale;
         }
       }
-      throw e;
+      throw error;
     } finally {
       if (dedupKey) pendingGetRequests.delete(dedupKey);
     }

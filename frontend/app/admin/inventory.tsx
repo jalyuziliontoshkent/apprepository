@@ -15,8 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FolderPlus, Package, Plus, Search, Trash2, Upload, X } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../../src/services/apiClient';
+import { api, backendUrl } from '../../src/services/apiClient';
+import { fetchApiRaw } from '../../src/services/http';
 import { useCurrency, useTheme } from '../../src/utils/theme';
 
 export default function AdminInventory() {
@@ -38,7 +38,6 @@ export default function AdminInventory() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
   const fetchData = useCallback(async () => {
     try {
@@ -131,16 +130,14 @@ export default function AdminInventory() {
       let image_url = '';
 
       if (imageUri) {
-        const token = await AsyncStorage.getItem('token');
         const formData = new FormData();
         const filename = imageUri.split('/').pop() || 'photo.jpg';
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : 'image/jpeg';
         formData.append('file', { uri: imageUri, name: filename, type } as any);
 
-        const res = await fetch(`${BACKEND_URL}/api/upload-image`, {
+        const res = await fetchApiRaw('/upload-image', {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
           body: formData,
         });
 
@@ -173,7 +170,7 @@ export default function AdminInventory() {
     } finally {
       setUploading(false);
     }
-  }, [BACKEND_URL, fetchData, imageUri, matForm, selectedCat]);
+  }, [fetchData, imageUri, matForm, selectedCat]);
 
   const deleteMat = useCallback((mat: any) => {
     Alert.alert("O'chirish", `"${mat.name}" ni o'chirasizmi?`, [
@@ -322,7 +319,7 @@ export default function AdminInventory() {
               <View style={styles.materialRow}>
                 {material.image_url ? (
                   <Image
-                    source={{ uri: material.image_url.startsWith('/') ? `${BACKEND_URL}${material.image_url}` : material.image_url }}
+                    source={{ uri: material.image_url.startsWith('/') ? `${backendUrl}${material.image_url}` : material.image_url }}
                     style={styles.materialImage}
                   />
                 ) : (

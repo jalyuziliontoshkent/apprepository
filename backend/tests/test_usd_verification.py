@@ -4,16 +4,12 @@ Tests: Materials have $ prices, Dealer credit limit is $5000, Statistics show $ 
 """
 import pytest
 import requests
-from pathlib import Path
+import os
+
 
 def get_backend_url():
-    env_file = Path('/app/frontend/.env')
-    if env_file.exists():
-        with open(env_file) as f:
-            for line in f:
-                if line.startswith('EXPO_PUBLIC_BACKEND_URL='):
-                    return line.split('=', 1)[1].strip()
-    return ''
+    return os.environ.get('BACKEND_BASE_URL', 'http://127.0.0.1:8000').strip()
+
 
 BASE_URL = get_backend_url().rstrip('/')
 
