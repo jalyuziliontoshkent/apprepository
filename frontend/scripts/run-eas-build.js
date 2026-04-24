@@ -12,7 +12,6 @@ const projectRoot = path.resolve(__dirname, '..');
 const easCommand = process.platform === 'win32' ? 'eas.cmd' : 'eas';
 const env = {
   ...process.env,
-  EAS_NO_VCS: '1',
   EAS_PROJECT_ROOT: projectRoot,
 };
 
