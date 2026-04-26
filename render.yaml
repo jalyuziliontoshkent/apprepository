@@ -12,7 +12,7 @@ services:
     startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
-      # 3.14 hali nozik; 3.12 barqaror (https://render.com/docs/python-version)
+      # rootDir=backend bo'lgani uchun backend/requirements.txt va server:app ishlatiladi.
       - key: PYTHON_VERSION
         value: "3.12.8"
       - key: DATABASE_URL
@@ -30,4 +30,6 @@ services:
       - key: CORS_ORIGINS
         sync: false
       - key: ENABLE_DEMO_SEED_DATA
+        value: "false"
+      - key: ASYNCPG_STRICT_SSL
         value: "false"

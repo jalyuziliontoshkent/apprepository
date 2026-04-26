@@ -15,6 +15,13 @@ def _get_required_env(name: str) -> str:
     return value
 
 
+def _get_jwt_secret() -> str:
+    value = _get_required_env("JWT_SECRET")
+    if len(value) < 32:
+        raise RuntimeError("JWT_SECRET kamida 32 belgidan iborat bo'lishi kerak")
+    return value
+
+
 def load_database_url() -> str:
     raw = os.environ.get("DATABASE_URL")
     if raw is None or not str(raw).strip():
@@ -43,13 +50,18 @@ def load_database_url() -> str:
     return url
 
 
+def _is_supabase_host(host: str) -> bool:
+    normalized = (host or "").strip().lower()
+    return normalized.endswith(".supabase.co") or normalized.endswith(".supabase.com")
+
+
 def asyncpg_ssl_context_for_dsn(dsn: str) -> ssl.SSLContext | None:
     try:
         host = (urlparse(dsn.replace("postgres://", "postgresql://", 1)).hostname or "").lower()
     except Exception:
         return None
 
-    if "supabase.co" not in host:
+    if not _is_supabase_host(host):
         return None
 
     strict = os.environ.get("ASYNCPG_STRICT_SSL", "").strip().lower() in {"1", "true", "yes"}
@@ -99,7 +111,7 @@ def load_settings() -> Settings:
 
     return Settings(
         database_url=load_database_url(),
-        jwt_secret=_get_required_env("JWT_SECRET"),
+        jwt_secret=_get_jwt_secret(),
         jwt_algorithm=os.environ.get("JWT_ALGORITHM", "HS256").strip() or "HS256",
         access_token_minutes=max(int(os.environ.get("ACCESS_TOKEN_MINUTES", "30")), 5),
         refresh_token_days=max(int(os.environ.get("REFRESH_TOKEN_DAYS", "30")), 1),
