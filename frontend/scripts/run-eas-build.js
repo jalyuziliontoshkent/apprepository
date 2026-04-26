@@ -88,6 +88,20 @@ function copyProject(sourceDir, targetDir) {
   }
 }
 
+function normalizePermissions(targetDir) {
+  fs.chmodSync(targetDir, 0o755);
+
+  for (const entry of fs.readdirSync(targetDir, { withFileTypes: true })) {
+    const targetPath = path.join(targetDir, entry.name);
+
+    if (entry.isDirectory()) {
+      normalizePermissions(targetPath);
+    } else {
+      fs.chmodSync(targetPath, 0o644);
+    }
+  }
+}
+
 function run(command, args, cwd) {
   const result = spawnSync(command, args, {
     cwd,
@@ -112,11 +126,7 @@ try {
 }
 
 copyProject(projectRoot, repoRoot);
-
-const nodeModulesPath = path.join(projectRoot, 'node_modules');
-if (fs.existsSync(nodeModulesPath)) {
-  fs.symlinkSync(nodeModulesPath, path.join(repoRoot, 'node_modules'), 'junction');
-}
+normalizePermissions(repoRoot);
 
 run('git', ['init', '--initial-branch=main'], repoRoot);
 run('git', ['config', 'user.name', 'Codex Build Bot'], repoRoot);
