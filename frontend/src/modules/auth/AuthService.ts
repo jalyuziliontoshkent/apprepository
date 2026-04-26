@@ -3,7 +3,6 @@ import { ApiError, isApiError } from '../../services/errors';
 import {
   type AuthSessionResponse,
   type LoginPayload,
-  type RegisterPayload,
 } from './contracts';
 import { useAuthStore, type User } from '../../store/useAuthStore';
 
@@ -56,29 +55,6 @@ export const AuthService = {
       return await persistSession(response);
     } catch (error) {
       throw mapAuthError(error);
-    }
-  },
-
-  async register(payload: RegisterPayload): Promise<User> {
-    try {
-      const response = await api<AuthSessionResponse>('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: payload.name.trim(),
-          email: payload.email.trim().toLowerCase(),
-          password: payload.password,
-          phone: payload.phone?.trim() ?? '',
-          address: payload.address?.trim() ?? '',
-        }),
-        dedup: false,
-      });
-
-      return await persistSession(response);
-    } catch (error) {
-      if (isApiError(error)) {
-        throw error;
-      }
-      throw mapAuthError(error, "Ro'yxatdan o'tishda xatolik yuz berdi.");
     }
   },
 

@@ -893,40 +893,12 @@ async def get_exchange_rate():
     return fallback
 
 # ─── AUTH ───
-@api_router.post("/auth/register")
+@api_router.post("/auth/register", include_in_schema=False)
 async def register(req: RegisterReq):
-    name = str(req.name or "").strip()
-    email = str(req.email or "").strip().lower()
-    password = req.password or ""
-
-    if not name:
-        raise HTTPException(400, "Ismni kiriting")
-    if not email or "@" not in email:
-        raise HTTPException(400, "To'g'ri email kiriting")
-    if len(password) < 8:
-        raise HTTPException(400, "Parol kamida 8 ta belgi bo'lishi kerak")
-
-    db = await get_pool()
-    existing = await db.fetchrow("SELECT id FROM users WHERE email = $1", email)
-    if existing:
-        raise HTTPException(400, "Bu email allaqachon mavjud")
-
-    now = datetime.now(timezone.utc).isoformat()
-    row = await db.fetchrow(
-        """
-        INSERT INTO users (name, email, password_hash, role, phone, address, credit_limit, debt, specialty, created_at)
-        VALUES ($1, $2, $3, 'dealer', $4, $5, 0, 0, '', $6)
-        RETURNING *
-        """,
-        name,
-        email,
-        hash_password(password),
-        str(req.phone or "").strip(),
-        str(req.address or "").strip(),
-        now,
+    raise HTTPException(
+        403,
+        "Yangi akkaunt ochish o'chirilgan. Akkauntni faqat administrator yaratishi mumkin.",
     )
-    cache.invalidate("dealers", "stats", "user_auth_")
-    return await issue_auth_session(db, row)
 
 
 @api_router.post("/auth/login")

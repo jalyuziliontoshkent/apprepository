@@ -123,9 +123,12 @@ export default function LoginScreen() {
               {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Kirish</Text>}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => router.push('/register' as never)} disabled={loading}>
-              <Text style={styles.link}>Yangi akkaunt ochish</Text>
-            </TouchableOpacity>
+            <View style={styles.noticeBox}>
+              <Text style={styles.noticeTitle}>Maxfiy ilova</Text>
+              <Text style={styles.noticeText}>
+                Yangi akkaunt ochish yopilgan. Faqat administrator yaratgan login bilan kirish mumkin.
+              </Text>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -206,11 +209,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.3,
   },
-  link: {
-    color: '#b2a7ff',
-    textAlign: 'center',
-    marginTop: 8,
-    fontSize: 14,
-    fontWeight: '600',
+  noticeBox: {
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#101010',
+    borderWidth: 1,
+    borderColor: '#1f1f1f',
+    gap: 4,
+  },
+  noticeTitle: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  noticeText: {
+    color: '#a4a4a4',
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
