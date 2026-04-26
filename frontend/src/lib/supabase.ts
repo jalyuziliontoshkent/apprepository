@@ -1,5 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { createClient } from '@supabase/supabase-js';
 
 function getEnvVar(...keys: string[]): string | undefined {
@@ -13,16 +14,29 @@ function getEnvVar(...keys: string[]): string | undefined {
   return undefined;
 }
 
+function getExtraValue(key: 'supabaseUrl' | 'supabaseAnonKey'): string | undefined {
+  try {
+    const extraValue =
+      Constants.expoConfig?.extra?.[key] ??
+      Constants.manifest2?.extra?.expoClient?.extra?.[key];
+    return typeof extraValue === 'string' && extraValue.trim() ? extraValue.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const supabaseUrl =
   getEnvVar('EXPO_PUBLIC_SUPABASE_URL') ??
   getEnvVar('NEXT_PUBLIC_SUPABASE_URL') ??
-  getEnvVar('REACT_APP_SUPABASE_URL');
+  getEnvVar('REACT_APP_SUPABASE_URL') ??
+  getExtraValue('supabaseUrl');
 
 const supabaseAnonKey =
   getEnvVar('EXPO_PUBLIC_SUPABASE_ANON_KEY') ??
   getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY') ??
   getEnvVar('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY') ??
-  getEnvVar('REACT_APP_SUPABASE_PUBLISHABLE_DEFAULT_KEY');
+  getEnvVar('REACT_APP_SUPABASE_PUBLISHABLE_DEFAULT_KEY') ??
+  getExtraValue('supabaseAnonKey');
 
 // Create a dummy client if env vars are missing - app won't crash but Supabase features won't work
 let supabase: ReturnType<typeof createClient>;

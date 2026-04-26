@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CheckCircle, LogOut, Ruler, Moon, Sun, DollarSign, Wallet } from 'lucide-react-native';
+import { AuthService } from '../../src/modules/auth/AuthService';
 import { api } from '../../src/services/apiClient';
 import { SectionCard } from '../../src/components/SectionCard';
 import { StateView } from '../../src/components/StateView';
@@ -19,7 +20,6 @@ export default function WorkerTasks() {
   const toggleTheme = useAppStore((state) => state.toggleTheme);
   const toggleCurrency = useAppStore((state) => state.toggleCurrency);
   const { currency } = useCurrency();
-  const logout = useAuthStore((state) => state.logout);
   const router = useRouter();
 
   const [tasks, setTasks] = useState<any[]>([]);
@@ -68,7 +68,7 @@ export default function WorkerTasks() {
   };
 
   const handleLogout = async () => {
-    await logout();
+    await AuthService.logout();
     router.replace('/');
   };
 

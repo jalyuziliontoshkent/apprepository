@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CreditCard, LogOut, MessageCircle, Package, ShoppingBag, Moon, Sun, DollarSign, Wallet } from 'lucide-react-native';
+import { AuthService } from '../../src/modules/auth/AuthService';
 import { api } from '../../src/services/apiClient';
 import { SectionCard } from '../../src/components/SectionCard';
 import { StateView } from '../../src/components/StateView';
@@ -19,7 +20,6 @@ export default function DealerDashboard() {
   const theme = useAppStore((state) => state.theme);
   const toggleTheme = useAppStore((state) => state.toggleTheme);
   const toggleCurrency = useAppStore((state) => state.toggleCurrency);
-  const logout = useAuthStore((state) => state.logout);
   const router = useRouter();
 
   const [orders, setOrders] = useState<any[]>([]);
@@ -46,7 +46,7 @@ export default function DealerDashboard() {
   }, [fetchData]);
 
   const handleLogout = async () => {
-    await logout();
+    await AuthService.logout();
     router.replace('/');
   };
 

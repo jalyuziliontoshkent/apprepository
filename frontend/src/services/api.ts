@@ -211,7 +211,7 @@ const executeRequest = async (
 };
 
 export const createApi = (baseUrl?: string) => {
-  const resolvedBaseUrl = (baseUrl?.trim() || '');
+  const resolvedBaseUrl = (baseUrl?.trim().replace(/\/+$/, '') || '');
 
   return async <T = any>(path: string, options: RequestOptions = {}): Promise<T> => {
     if (!resolvedBaseUrl) {

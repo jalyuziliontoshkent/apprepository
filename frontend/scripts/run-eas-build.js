@@ -1,5 +1,4 @@
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
@@ -12,13 +11,16 @@ if (!platform || !profile) {
 
 const projectRoot = path.resolve(__dirname, '..');
 const easCommand = process.platform === 'win32' ? 'eas.cmd' : 'eas';
-const repoRoot = path.join(os.tmpdir(), `lionapk-eas-${Date.now()}`);
+const repoRoot = path.join(projectRoot, '.eas-tmp-build');
 
 const excludedDirs = new Set([
   '.git',
+  '.eas-tmp-build',
   '.expo',
   '.metro-cache',
+  'android',
   'dist',
+  'ios',
   'web-build',
   'inspect-archive',
   'inspect-prebuild',
@@ -101,6 +103,12 @@ function run(command, args, cwd) {
   if (result.error) {
     throw result.error;
   }
+}
+
+try {
+  fs.rmSync(repoRoot, { recursive: true, force: true });
+} catch {
+  // Best effort cleanup only.
 }
 
 copyProject(projectRoot, repoRoot);
