@@ -1,5 +1,5 @@
 const backendUrl =
-  process.env.EXPO_PUBLIC_BACKEND_URL || 'https://lion-blinds-backend.onrender.com';
+  process.env.EXPO_PUBLIC_BACKEND_URL || 'https://lion-blinds-backend1.onrender.com';
 const supabaseUrl =
   process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://rgqgefqmuwqeritnxely.supabase.co';
 const supabaseAnonKey =
