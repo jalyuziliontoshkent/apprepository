@@ -1868,6 +1868,24 @@ async def create_tables(db):
         await db.execute("ALTER TABLE user_settings ADD CONSTRAINT user_settings_user_id_unique UNIQUE (user_id)")
     except Exception:
         pass
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS refresh_tokens (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token_hash TEXT NOT NULL UNIQUE,
+            expires_at TIMESTAMPTZ NOT NULL,
+            revoked_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS revoked_tokens (
+            id SERIAL PRIMARY KEY,
+            token_jti TEXT NOT NULL UNIQUE,
+            expires_at TIMESTAMPTZ NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
 
 async def seed_admin(db):
     if not settings.enable_demo_seed_data:
