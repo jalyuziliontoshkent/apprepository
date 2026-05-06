@@ -361,10 +361,15 @@ def pick_reference_value(id_candidates: List[str], udt_name: Optional[str]):
     if not candidates:
         return None
     if udt_name == "uuid":
+        # UUID topilmasa integer ID ni string sifatida qaytaramiz
         for value in reversed(candidates):
             if "-" in value:
                 return value
-        return None
+        # UUID yo'q — integer ID ni ishlatamiz (DB auto-cast qiladi)
+        for value in candidates:
+            if value.lstrip("-").isdigit():
+                return value
+        return candidates[0]
     if udt_name in {"int2", "int4", "int8"}:
         for value in candidates:
             if value.lstrip("-").isdigit():
