@@ -823,6 +823,9 @@ class AssignItemReq(BaseModel): worker_id: str
 class DeliveryInfoReq(BaseModel): driver_name: str; driver_phone: str; plate_number: str = ""
 class PaymentCreate(BaseModel): amount: float; note: str = ""
 class PushTokenReq(BaseModel): token: str; platform: Optional[str] = None
+class RegisterReq(BaseModel): email: Optional[str] = None; password: Optional[str] = None; name: Optional[str] = None
+class RefreshTokenReq(BaseModel): refresh_token: str
+class LogoutReq(BaseModel): refresh_token: Optional[str] = None
 
 
 @api_router.get("/exchange-rate")
