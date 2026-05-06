@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -7,7 +8,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -39,23 +39,20 @@ export default function LoginScreen() {
 
     try {
       const user = await AuthService.login(trimmedEmail, password);
-      const dest =
+      const destination =
         user.role === 'admin'
           ? '/admin/dashboard'
           : user.role === 'worker'
             ? '/worker/tasks'
             : '/dealer/dashboard';
-      router.replace(dest as never);
-    } catch (e: any) {
-      if (
-        e?.message?.includes("noto'g'ri") ||
-        e?.message === 'Invalid login credentials'
-      ) {
+      router.replace(destination as never);
+    } catch (error: any) {
+      if (error?.message?.includes("noto'g'ri") || error?.message === 'Invalid login credentials') {
         setError("Email yoki parol noto'g'ri.");
-      } else if (e?.code === 'NETWORK' || e?.message?.includes('ulanib')) {
+      } else if (error?.code === 'NETWORK' || error?.message?.includes('ulanib')) {
         setError('Serverga ulanishda xatolik.');
       } else {
-        setError(e?.message || "Xatolik yuz berdi. Qayta urinib ko'ring.");
+        setError(error?.message || "Xatolik yuz berdi. Qayta urinib ko'ring.");
       }
     } finally {
       setLoading(false);
@@ -72,7 +69,6 @@ export default function LoginScreen() {
         keyboardVerticalOffset={0}
       >
         <View style={styles.container}>
-          {/* Logo */}
           <View style={styles.logoWrap}>
             <View style={styles.logoBox}>
               <Image
@@ -84,14 +80,16 @@ export default function LoginScreen() {
             <Text style={styles.brand}>Lion Blinds</Text>
           </View>
 
-          {/* Form */}
           <View style={styles.form}>
             <TextInput
               style={styles.input}
               placeholder="Email"
               placeholderTextColor="#666"
               value={email}
-              onChangeText={(v) => { setEmail(v); setError(''); }}
+              onChangeText={(value) => {
+                setEmail(value);
+                setError('');
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -104,29 +102,33 @@ export default function LoginScreen() {
               placeholder="Parol"
               placeholderTextColor="#666"
               value={password}
-              onChangeText={(v) => { setPassword(v); setError(''); }}
+              onChangeText={(value) => {
+                setPassword(value);
+                setError('');
+              }}
               secureTextEntry
               returnKeyType="done"
               onSubmitEditing={handleLogin}
               editable={!loading}
             />
 
-            {error ? (
-              <Text style={styles.error}>{error}</Text>
-            ) : null}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <TouchableOpacity
-              style={[styles.btn, loading && styles.btnDisabled]}
+              style={[styles.button, loading && styles.buttonDisabled]}
               onPress={handleLogin}
               activeOpacity={0.85}
               disabled={loading}
             >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.btnText}>Kirish  →</Text>
-              )}
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Kirish</Text>}
             </TouchableOpacity>
+
+            <View style={styles.noticeBox}>
+              <Text style={styles.noticeTitle}>Maxfiy ilova</Text>
+              <Text style={styles.noticeText}>
+                Yangi akkaunt ochish yopilgan. Faqat administrator yaratgan login bilan kirish mumkin.
+              </Text>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -139,7 +141,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  flex: { flex: 1 },
+  flex: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -188,7 +192,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     paddingHorizontal: 4,
   },
-  btn: {
+  button: {
     backgroundColor: '#5B4FE8',
     borderRadius: 10,
     paddingVertical: 16,
@@ -196,13 +200,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 4,
   },
-  btnDisabled: {
+  buttonDisabled: {
     opacity: 0.6,
   },
-  btnText: {
+  buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  noticeBox: {
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#101010',
+    borderWidth: 1,
+    borderColor: '#1f1f1f',
+    gap: 4,
+  },
+  noticeTitle: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  noticeText: {
+    color: '#a4a4a4',
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

@@ -5,17 +5,11 @@ Tests: Auth, Statistics, Materials, Dealers, Orders, Chat
 import pytest
 import requests
 import os
-from pathlib import Path
 
-# Read BASE_URL from frontend .env file
+
 def get_backend_url():
-    env_file = Path('/app/frontend/.env')
-    if env_file.exists():
-        with open(env_file) as f:
-            for line in f:
-                if line.startswith('EXPO_PUBLIC_BACKEND_URL='):
-                    return line.split('=', 1)[1].strip()
-    return ''
+    return os.environ.get('BACKEND_BASE_URL', 'http://127.0.0.1:8000').strip()
+
 
 BASE_URL = get_backend_url().rstrip('/')
 
@@ -35,8 +29,8 @@ def admin_token(api_client):
     })
     assert response.status_code == 200, f"Admin login failed: {response.text}"
     data = response.json()
-    assert "token" in data
-    return data["token"]
+    assert data.get("access_token") or data.get("token")
+    return data.get("access_token") or data.get("token")
 
 @pytest.fixture
 def dealer_token(api_client):
@@ -47,8 +41,8 @@ def dealer_token(api_client):
     })
     assert response.status_code == 200, f"Dealer login failed: {response.text}"
     data = response.json()
-    assert "token" in data
-    return data["token"]
+    assert data.get("access_token") or data.get("token")
+    return data.get("access_token") or data.get("token")
 
 class TestAuth:
     """Authentication endpoint tests"""
@@ -61,7 +55,7 @@ class TestAuth:
         })
         assert response.status_code == 200
         data = response.json()
-        assert "token" in data
+        assert data.get("access_token") or data.get("token")
         assert "user" in data
         assert data["user"]["email"] == "admin@curtain.uz"
         assert data["user"]["role"] == "admin"
@@ -75,7 +69,7 @@ class TestAuth:
         })
         assert response.status_code == 200
         data = response.json()
-        assert "token" in data
+        assert data.get("access_token") or data.get("token")
         assert "user" in data
         assert data["user"]["email"] == "dealer@test.uz"
         assert data["user"]["role"] == "dealer"

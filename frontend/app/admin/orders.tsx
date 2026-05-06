@@ -24,10 +24,10 @@ import {
   User,
   X,
 } from 'lucide-react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { api, backendUrl } from '../../src/services/apiClient';
+import { getAuthorizedHeaders } from '../../src/services/http';
 import { getStatusColor, statusLabels, useCurrency, useTheme } from '../../src/utils/theme';
 
 const filters = ['all', 'kutilmoqda', 'tasdiqlangan', 'tayyorlanmoqda', 'tayyor', 'yetkazilmoqda', 'yetkazildi', 'rad_etilgan'];
@@ -81,15 +81,11 @@ export default function AdminOrders() {
     setExporting(true);
 
     try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) {
-        throw new Error('Token topilmadi');
-      }
-
+      const headers = await getAuthorizedHeaders();
       const exportUrl = `${backendUrl}/api/reports/export-orders`;
 
       if (Platform.OS === 'web') {
-        const res = await fetch(exportUrl, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch(exportUrl, { headers });
         if (!res.ok) {
           throw new Error('Excel yuklab bo`lmadi');
         }
@@ -104,7 +100,7 @@ export default function AdminOrders() {
       } else {
         const fileUri = `${(FileSystem as any).documentDirectory || ''}buyurtmalar.xlsx`;
         const res = await FileSystem.downloadAsync(exportUrl, fileUri, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers,
         });
 
         if (await Sharing.isAvailableAsync()) {

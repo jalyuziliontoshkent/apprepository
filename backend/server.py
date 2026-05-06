@@ -22,6 +22,17 @@ from pydantic import BaseModel
 from typing import List, Optional
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from modules.auth.dependencies import get_current_user, require_admin, require_worker, revoke_access_token
+from modules.auth.security import (
+    create_access_token as create_access_token_value,
+    create_refresh_token,
+    decode_token,
+    get_refresh_expires_at,
+    hash_password as hash_password_value,
+    sha256_text,
+    verify_password as verify_password_value,
+)
+from modules.common.config import asyncpg_ssl_context_for_dsn, load_settings
 from modules.common.indexes import create_indexes
 from modules.common.logging import configure_logging
 from modules.common.middleware import install_middleware
@@ -33,63 +44,8 @@ KEEP_ALIVE_INTERVAL_SECONDS = 60
 INVENTORY_SYNC_STATUSES = {"tayyor", "yetkazilmoqda", "yetkazildi"}
 
 
-def load_database_url() -> str:
-    """Render/Supabase uchun DSN: bo'sh hostname va IDNA xatolarini oldini oladi."""
-    raw = os.environ.get("DATABASE_URL")
-    if raw is None or not str(raw).strip():
-        raise RuntimeError(
-            "DATABASE_URL yo'q yoki bo'sh. Render → Environment → DATABASE_URL qo'shing "
-            "(Supabase → Database → URI, Transaction pooler, port 6543)."
-        )
-    url = str(raw).strip()
-    if len(url) >= 2 and url[0] == url[-1] and url[0] in "\"'":
-        url = url[1:-1].strip()
-    url = url.lstrip("\ufeff\u200b\u200c\u200d").strip()
-    parsed = urlparse(url.replace("postgres://", "postgresql://", 1))
-    host = parsed.hostname
-    if not host or not str(host).strip():
-        raise RuntimeError(
-            "DATABASE_URL da HOSTNAME bo'sh (noto'g'ri URL). Odatda parolda @ : # % bo'lganda "
-            "URL-encoding qilinmagan: urllib.parse.quote_plus(parol) bilan almashtiring. "
-            "Yoki Supabase'dan 'Connection string' ni to'liq nusxalang."
-        )
-    hn = str(host).strip().lower()
-    # Railway/Render da ko'pincha hujjatdan "..." yoki [YOUR-PASSWORD] nusxalanadi
-    if hn == "..." or hn.startswith("...") or "..." in hn:
-        raise RuntimeError(
-            "DATABASE_URL ichida hostname o'rniga '...' qolgan (namuna matn). "
-            "Railway → Variables → DATABASE_URL: Supabase → Project Settings → Database → "
-            "Connection string → URI (Transaction pooler, port 6543) ni BUTUNLAY nusxalang. "
-            "Hech qayerda ... yoki [YOUR-PASSWORD] qoldirmang."
-        )
-    if hn.startswith(".") or ".." in hn or hn.startswith("@"):
-        raise RuntimeError(
-            f"DATABASE_URL hostname noto'g'ri: {host!r}. "
-            "URL noto'g'ri kesilgan yoki boshida nuqta bor — Supabase URI ni qayta nusxalang."
-        )
-    return url
-
-
-def asyncpg_ssl_context_for_dsn(dsn: str) -> Optional[ssl.SSLContext]:
-    """
-    Supabase pooler: Railway/Render yo'lida CA zanjiri ba'zan 'self-signed in chain' beradi.
-    Standart: TLS shifrlangan, lekin server sertifikati tekshirilmaydi (asyncpg + bulut uchun odatiy yechim).
-    Qat'iy tekshiruv: ASYNCPG_STRICT_SSL=1 (mahalliy/yaxshi tarmoq).
-    """
-    try:
-        h = (urlparse(dsn.replace("postgres://", "postgresql://", 1)).hostname or "").lower()
-    except Exception:
-        return None
-    if "supabase.co" not in h:
-        return None
-    strict = os.environ.get("ASYNCPG_STRICT_SSL", "").strip().lower() in ("1", "true", "yes")
-    if strict:
-        return ssl.create_default_context(cafile=certifi.where())
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    logger.debug("Supabase pooler: TLS (sertifikat verify o'chiq, bulut muvofiqligi)")
-    return ctx
+settings = load_settings()
+DATABASE_URL = settings.database_url
 
 
 def asyncpg_pool_kwargs():
@@ -107,15 +63,13 @@ def asyncpg_pool_kwargs():
     return kw
 
 
-DATABASE_URL = load_database_url()
-
 UPLOAD_DIR = ROOT_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 app = FastAPI()
 app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 api_router = APIRouter(prefix="/api")
-JWT_ALGORITHM = "HS256"
+JWT_ALGORITHM = settings.jwt_algorithm
 install_middleware(app, logger)
 
 # ─── IN-MEMORY CACHE (DB tezlashtirish) ───
@@ -174,16 +128,57 @@ def get_jwt_secret():
     return secret
 def hash_password(pw: str) -> str: return bcrypt.hashpw(pw.encode(), bcrypt.gensalt(12)).decode()
 def verify_password(plain: str, hashed: str) -> bool:
-    try:
-        if not plain or not hashed:
-            return False
-        return bcrypt.checkpw(plain.encode(), hashed.encode())
-    except (TypeError, ValueError):
+    is_valid = verify_password_value(plain, hashed)
+    if not is_valid and plain and hashed:
         logger.warning("Invalid password hash encountered during login")
-        return False
+    return is_valid
+
 
 def create_access_token(uid: str, email: str, role: str) -> str:
-    return jwt.encode({"sub": uid, "email": email, "role": role, "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "access"}, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+    token, _, _ = create_access_token_value(settings, {"id": uid, "email": email, "role": role})
+    return token
+
+
+async def issue_auth_session(db, user_row, *, revoke_existing_refresh: bool = True) -> dict:
+    user = row_to_dict(user_row)
+    if user is None:
+        raise HTTPException(401, "User not found")
+
+    user["id"] = str(user["id"])
+    user.pop("password_hash", None)
+
+    access_token, _, access_expires_at = create_access_token_value(settings, user)
+    refresh_token = create_refresh_token()
+    refresh_expires_at = get_refresh_expires_at(settings)
+    now = datetime.now(timezone.utc)
+
+    if revoke_existing_refresh:
+        await db.execute(
+            "UPDATE refresh_tokens SET revoked_at = $2 WHERE user_id = $1 AND revoked_at IS NULL",
+            int(user["id"]),
+            now,
+        )
+
+    await db.execute(
+        """
+        INSERT INTO refresh_tokens (user_id, token_hash, expires_at, revoked_at, created_at)
+        VALUES ($1, $2, $3, NULL, $4)
+        """,
+        int(user["id"]),
+        sha256_text(refresh_token),
+        refresh_expires_at,
+        now,
+    )
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_at": access_expires_at.isoformat(),
+        "token": access_token,
+        "user": user,
+    }
+
 
 def generate_order_code():
     return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
@@ -825,7 +820,6 @@ class PaymentCreate(BaseModel): amount: float; note: str = ""
 class PushTokenReq(BaseModel): token: str; platform: Optional[str] = None
 
 
-# ─── EXCHANGE RATE (Real-time USD/UZS) ───
 @api_router.get("/exchange-rate")
 async def get_exchange_rate():
     """O'zbekiston Markaziy Banki dan real vaqtda dollar kursini olish"""
@@ -847,6 +841,14 @@ async def get_exchange_rate():
     return fallback
 
 # ─── AUTH ───
+@api_router.post("/auth/register", include_in_schema=False)
+async def register(req: RegisterReq):
+    raise HTTPException(
+        403,
+        "Yangi akkaunt ochish o'chirilgan. Akkauntni faqat administrator yaratishi mumkin.",
+    )
+
+
 @api_router.post("/auth/login")
 async def login(req: LoginReq):
     email = (req.email or "").strip().lower()
@@ -856,29 +858,85 @@ async def login(req: LoginReq):
 
     db = await get_pool()
     user = await db.fetchrow("SELECT * FROM users WHERE email = $1", email)
-    
     if not user:
         raise HTTPException(401, "Email yoki parol noto'g'ri")
-        
+
     loop = asyncio.get_running_loop()
     is_valid = await loop.run_in_executor(None, verify_password, password, user["password_hash"])
-    
     if not is_valid:
         raise HTTPException(401, "Email yoki parol noto'g'ri")
-    try:
-        token = create_access_token(str(user["id"]), user["email"], user["role"])
-    except RuntimeError as e:
-        logger.error("Auth configuration error: %s", e)
-        raise HTTPException(500, "Auth service is not configured")
-    u = row_to_dict(user)
-    u["id"] = str(u["id"])
-    u.pop("password_hash", None)
-    return {"token": token, "user": u}
+
+    return await issue_auth_session(db, user)
+
+
+@api_router.post("/auth/refresh")
+async def refresh_auth_session(req: RefreshTokenReq):
+    refresh_token = (req.refresh_token or "").strip()
+    if not refresh_token:
+        raise HTTPException(400, "Refresh token kerak")
+
+    db = await get_pool()
+    token_hash = sha256_text(refresh_token)
+    refresh_row = await db.fetchrow(
+        """
+        SELECT user_id
+        FROM refresh_tokens
+        WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > NOW()
+        LIMIT 1
+        """,
+        token_hash,
+    )
+    if not refresh_row:
+        raise HTTPException(401, "Sessiya tugagan, qayta kiring")
+
+    now = datetime.now(timezone.utc)
+    await db.execute(
+        "UPDATE refresh_tokens SET revoked_at = $2 WHERE token_hash = $1 AND revoked_at IS NULL",
+        token_hash,
+        now,
+    )
+
+    user = await db.fetchrow("SELECT * FROM users WHERE id = $1", int(refresh_row["user_id"]))
+    if not user:
+        raise HTTPException(401, "User not found")
+
+    return await issue_auth_session(db, user, revoke_existing_refresh=False)
+
+
+@api_router.post("/auth/logout")
+async def logout(req: LogoutReq, request: Request):
+    db = await get_pool()
+    refresh_token = (req.refresh_token or "").strip()
+    if refresh_token:
+        await db.execute(
+            "UPDATE refresh_tokens SET revoked_at = COALESCE(revoked_at, $2) WHERE token_hash = $1",
+            sha256_text(refresh_token),
+            datetime.now(timezone.utc),
+        )
+
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        try:
+            payload = decode_token(settings, auth_header[7:], expected_type="access")
+            token_jti = str(payload.get("jti") or "").strip()
+            exp_value = payload.get("exp")
+            if isinstance(exp_value, (int, float)):
+                expires_at = datetime.fromtimestamp(exp_value, timezone.utc)
+            else:
+                expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_minutes)
+            await revoke_access_token(request, token_jti, expires_at)
+        except Exception:
+            logger.info("Logout access token revoke skipped: token already invalid")
+
+    return {"message": "Sessiya yopildi"}
+
 
 @api_router.get("/auth/me")
-async def get_me(user: dict = Depends(get_current_user)): return {"user": user}
+async def get_me(user: dict = Depends(get_current_user)):
+    return {"user": user}
 
-# ─── AUTH: Update own profile ───
+
+# ????????? AUTH: Update own profile ?????????
 @api_router.put("/auth/profile")
 async def update_profile(request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
@@ -902,8 +960,8 @@ async def update_profile(request: Request, user: dict = Depends(get_current_user
         params.append(new_email)
         param_idx += 1
     if new_password:
-        if len(new_password) < 4:
-            raise HTTPException(400, "Parol kamida 4 ta belgi")
+        if len(new_password) < 8:
+            raise HTTPException(400, "Parol kamida 8 ta belgi")
         updates.append(f"password_hash = ${param_idx}")
         params.append(hash_password(new_password))
         param_idx += 1
@@ -915,8 +973,9 @@ async def update_profile(request: Request, user: dict = Depends(get_current_user
     u = row_to_dict(updated)
     u["id"] = str(u["id"])
     u.pop("password_hash", None)
-    token = create_access_token(u["id"], u.get("email", ""), u.get("role", ""))
-    return {"user": u, "token": token, "message": "Profil yangilandi"}
+    response = await issue_auth_session(db, updated)
+    response["message"] = "Profil yangilandi"
+    return response
 
 # ─── DEALERS ───
 @api_router.post("/dealers")
@@ -1793,6 +1852,10 @@ async def create_tables(db):
         pass
 
 async def seed_admin(db):
+    if not settings.enable_demo_seed_data:
+        logger.info("Demo seed data disabled for APP_ENV=%s", settings.app_env)
+        return
+
     email = os.environ.get("ADMIN_EMAIL", "admin@curtain.uz")
     pw = os.environ.get("ADMIN_PASSWORD", "")
     if not pw:
@@ -2174,6 +2237,10 @@ async def keep_alive_task():
 async def startup():
     global pool
     pool = await asyncpg.create_pool(DATABASE_URL, **asyncpg_pool_kwargs())
+    app.state.settings = settings
+    app.state.cache = cache
+    app.state.logger = logger
+    app.state.get_pool = get_pool
     async with pool.acquire() as conn:
         await create_tables(conn)
         await create_indexes(conn)
@@ -2189,4 +2256,4 @@ async def shutdown():
 
 app.include_router(api_router)
 app.add_middleware(GZipMiddleware, minimum_size=800)
-app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=settings.cors_origins, allow_methods=["*"], allow_headers=["*"])

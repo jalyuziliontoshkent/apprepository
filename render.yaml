@@ -7,11 +7,12 @@ services:
     runtime: python
     region: singapore
     plan: starter
+    rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn backend.server:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
-      # 3.14 hali nozik; 3.12 barqaror (https://render.com/docs/python-version)
+      # rootDir=backend bo'lgani uchun backend/requirements.txt va server:app ishlatiladi.
       - key: PYTHON_VERSION
         value: "3.12.8"
       - key: DATABASE_URL

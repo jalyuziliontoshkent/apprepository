@@ -1,26 +1,37 @@
+import Constants from 'expo-constants';
 import { createApi } from './api';
 
-/** Production API. Telefon buildida lokal URL ishlatilmasin. */
-const FALLBACK_PRODUCTION = 'https://lion-blinds-backend.onrender.com';
+function normalizeUrl(value?: string | null): string | undefined {
+  const normalized = typeof value === 'string' ? value.trim().replace(/\/+$/, '') : '';
+  return normalized || undefined;
+}
 
 function getEnvBackendUrl(): string | undefined {
-  // Try multiple sources for the backend URL
-  // 1. process.env (for Metro bundler) - primary source for React Native
   try {
     const envVar = typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_BACKEND_URL : undefined;
-    const env1 = typeof envVar === 'string' ? envVar.trim() : undefined;
+    const env1 = normalizeUrl(envVar);
     if (env1) return env1;
-  } catch { /* ignore */ }
+  } catch {
+    // ignore
+  }
 
-  // 2. global __ENV__ (for some web builds)
   try {
-    const globalEnv = (typeof global !== 'undefined' && (global as any).__ENV__?.EXPO_PUBLIC_BACKEND_URL);
-    const env2 = typeof globalEnv === 'string' ? globalEnv.trim() : undefined;
+    const globalEnv = typeof global !== 'undefined' ? (global as any).__ENV__?.EXPO_PUBLIC_BACKEND_URL : undefined;
+    const env2 = normalizeUrl(globalEnv);
     if (env2) return env2;
-  } catch { /* ignore */ }
+  } catch {
+    // ignore
+  }
 
-  // Note: import.meta.env is not used because it's not supported in Hermes (Android)
-  // The fallback URL will be used if no env var is found
+  try {
+    const extraValue =
+      Constants.expoConfig?.extra?.backendUrl ??
+      Constants.manifest2?.extra?.expoClient?.extra?.backendUrl;
+    const env3 = normalizeUrl(typeof extraValue === 'string' ? extraValue : undefined);
+    if (env3) return env3;
+  } catch {
+    // ignore
+  }
 
   return undefined;
 }
@@ -41,6 +52,7 @@ export const api = createApi(backendUrl);
 let warmupPromise: Promise<void> | null = null;
 
 export const warmBackend = async (): Promise<void> => {
+  if (!backendUrl) return;
   if (warmupPromise) return warmupPromise;
 
   warmupPromise = fetch(`${backendUrl}/api/health`)

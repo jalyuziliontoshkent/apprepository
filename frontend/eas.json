@@ -59,11 +59,11 @@
     "playstore": {
       "distribution": "store",
       "environment": "production",
-      "autoIncrement": true,
       "env": {
         "EAS_BUILD_NO_EXPO_GO_WARNING": "true",
         "EXPO_PUBLIC_BACKEND_URL": "https://lion-blinds-backend.onrender.com"
       },
+      "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
       }

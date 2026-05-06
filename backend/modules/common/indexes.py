@@ -13,4 +13,8 @@ async def create_indexes(db):
     ]
 
     for statement in statements:
-        await db.execute(statement)
+        try:
+            await db.execute(statement)
+        except Exception:
+            # Legacy databases may be missing optional columns; startup should stay healthy.
+            continue

@@ -10,6 +10,7 @@ import {
   Wallet,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { AuthService } from '../../src/modules/auth/AuthService';
 import { api } from '../../src/services/apiClient';
 import { StateView } from '../../src/components/StateView';
 import { useAuthStore } from '../../src/store/useAuthStore';
@@ -32,7 +33,6 @@ export default function AdminDashboard() {
   const theme = useAppStore((state) => state.theme);
   const toggleTheme = useAppStore((state) => state.toggleTheme);
   const toggleCurrency = useAppStore((state) => state.toggleCurrency);
-  const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
   const router = useRouter();
 
@@ -88,9 +88,9 @@ export default function AdminDashboard() {
   }, [fetchData]);
 
   const handleLogout = useCallback(async () => {
-    await logout();
+    await AuthService.logout();
     router.replace('/');
-  }, [logout, router]);
+  }, [router]);
 
   const daily = Array.isArray(reports?.daily) ? reports.daily : [];
   const topMaterials = Array.isArray(reports?.top_materials) ? reports.top_materials : [];
