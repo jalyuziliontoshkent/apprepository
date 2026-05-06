@@ -1277,20 +1277,16 @@ async def create_order(data: OrderCreate, user: dict = Depends(get_current_user)
             status_value = await normalize_status_for_db(conn, "kutilmoqda")
             dealer_ids = await resolve_actor_ids(conn, user)
             dealer_id_udt = await column_udt_name(conn, "orders", "dealer_id")
-            # Har qanday tip uchun ishlaydi: INTEGER, UUID, TEXT
+            dealer_ref = None
             if dealer_ids:
                 raw_id = dealer_ids[0]
                 if dealer_id_udt in {"int2", "int4", "int8"} and raw_id.lstrip("-").isdigit():
                     dealer_ref = int(raw_id)
                 elif dealer_id_udt == "uuid":
-                    # UUID column: UUID formatdagi ID qidirish, yo'q bo'lsa NULL
-                    uuid_val = next((v for v in dealer_ids if "-" in v and len(v) == 36), None)
-                    dealer_ref = uuid_val  # None bo'lsa dealer_id yozilmaydi
-                else:
+                    dealer_ref = next((v for v in dealer_ids if "-" in v and len(v) == 36), None)
+                elif dealer_id_udt in {"text", "varchar"}:
                     dealer_ref = raw_id
-            else:
-                dealer_ref = None
-            # dealer_id NULL bo'lsa ham buyurtma yaratiladi - dealer_name orqali aniqlanadi
+                # dealer_ref None bo'lsa dealer_id yozilmaydi - dealer_name orqali ishlaydi
 
             if await column_exists(conn, "orders", "items"):
                 order_values = await filter_existing_fields(conn, "orders", {
