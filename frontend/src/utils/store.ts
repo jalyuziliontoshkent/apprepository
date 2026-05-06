@@ -82,11 +82,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
 const fetchExchangeRate = async (): Promise<number | null> => {
   try {
-    const res = await fetch('https://cbu.uz/uz/arkhiv-kursov-valyut/json/');
+    const res = await fetch('https://cbu.uz/oz/arkhiv-kursov-valyut/json/USD/');
     const data = await res.json();
-    const usd = data.find((item: any) => item.Ccy === 'USD');
-    if (usd && usd.Rate) {
-      return Number(usd.Rate);
+    if (Array.isArray(data) && data[0]?.Rate) {
+      return Number(data[0].Rate);
     }
     return null;
   } catch (error) {

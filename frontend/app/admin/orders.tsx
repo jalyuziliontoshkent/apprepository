@@ -72,8 +72,8 @@ export default function AdminOrders() {
       setShowModal(false);
       setSelectedOrder(null);
       setRejectionReason('');
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      Alert.alert('Xatolik', e?.message || 'Status yangilanmadi');
     }
   }, [fetchOrders]);
 
@@ -386,9 +386,11 @@ export default function AdminOrders() {
                       <TouchableOpacity
                         style={styles.rejectButton}
                         onPress={() => {
-                          if (rejectionReason.trim()) {
-                            updateStatus(selectedOrder.id, 'rad_etilgan', rejectionReason);
+                          if (!rejectionReason.trim()) {
+                            Alert.alert('Xatolik', 'Rad etish sababini kiriting');
+                            return;
                           }
+                          updateStatus(selectedOrder.id, 'rad_etilgan', rejectionReason);
                         }}
                       >
                         <X size={16} color={c.danger} />

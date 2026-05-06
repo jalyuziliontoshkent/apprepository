@@ -38,7 +38,7 @@ export default function AdminInventory() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+  const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://lion-blinds-backend.onrender.com';
 
   const fetchData = useCallback(async () => {
     try {
@@ -194,7 +194,7 @@ export default function AdminInventory() {
   }, [fetchData]);
 
   const filteredMaterials = materials.filter((material) => {
-    if (selectedCat && material.category_id !== selectedCat.id) {
+    if (selectedCat && String(material.category_id) !== String(selectedCat.id)) {
       return false;
     }
 

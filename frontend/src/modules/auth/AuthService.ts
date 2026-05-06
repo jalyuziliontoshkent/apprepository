@@ -20,7 +20,6 @@ const normalizeUser = (user: User): User => ({
 
 export const AuthService = {
   async login(email: string, password: string): Promise<User> {
-    console.log('[AuthService] Login started for:', email);
     try {
       const response = await api<LoginResponse>('/auth/login', {
         method: 'POST',
@@ -32,18 +31,15 @@ export const AuthService = {
       });
 
       const user = normalizeUser(response.user);
-      console.log('[AuthService] Login success, user:', user.email, 'role:', user.role);
       await useAuthStore.getState().setUser(user, response.token);
       return user;
     } catch (error: any) {
-      console.error('[AuthService] Login error:', error?.message || error);
       if (isApiError(error)) {
         if (error.code === 'UNAUTHORIZED') {
           throw new ApiError("Email yoki parol noto'g'ri.", 'UNAUTHORIZED', error.status, error.details);
         }
         throw error;
       }
-
       throw new ApiError("Serverga ulanib bo'lmadi." + (error?.message ? ' (' + error.message + ')' : ''), 'NETWORK');
     }
   },

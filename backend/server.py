@@ -7,7 +7,7 @@ sys.path.insert(0, str(ROOT_DIR))
 load_dotenv(ROOT_DIR / '.env')
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, UploadFile, File
-from fastapi.responses import Response, StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.cors import CORSMiddleware
@@ -172,7 +172,7 @@ def get_jwt_secret():
     if not secret:
         raise RuntimeError("JWT_SECRET is not configured")
     return secret
-def hash_password(pw: str) -> str: return bcrypt.hashpw(pw.encode(), bcrypt.gensalt(4)).decode()
+def hash_password(pw: str) -> str: return bcrypt.hashpw(pw.encode(), bcrypt.gensalt(12)).decode()
 def verify_password(plain: str, hashed: str) -> bool:
     try:
         if not plain or not hashed:
@@ -757,65 +757,7 @@ async def deduct_inventory_for_order(conn, order_row, now: str):
 
 async def get_current_user(request: Request) -> dict:
     auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "): 
-        logger.error("Auth error: Missing or invalid Authorization header")
-        raise HTTPException(401, "Not authenticated")
-    try:
-        p = jwt.decode(auth[7:], get_jwt_secret(), algorithms=[JWT_ALGORITHM])
-        try:
-            user_id = int(p["sub"])
-        except (ValueError, TypeError):
-            raise HTTPException(401, "Invalid token format - please login again")
-            
-        cache_key = f"user_auth_{user_id}"
-        cached_user = cache.get(cache_key)
-        if cached_user:
-            return cached_user
-            
-        db = await get_pool()
-        row = await db.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
-        if not row: raise HTTPException(401, "User not found")
-        user = row_to_dict(row)
-        user["id"] = str(user["id"])
-        user.pop("password_hash", None)
-        
-        cache.set(cache_key, user, 60) # 1 minut xotirada saqlash
-        return user
-    except jwt.ExpiredSignatureError: 
-        logger.error("Auth error: Token expired")
-        raise HTTPException(401, "Token expired")
-    except jwt.InvalidTokenError as e: 
-        logger.error(f"Auth error: Invalid token {e}")
-        raise HTTPException(401, "Invalid token")
-    except HTTPException: raise
-    except Exception as e:
-        logger.error(f"Auth error (other): {e}")
-        raise HTTPException(401, "Authentication failed")
-
-async def require_admin(request: Request) -> dict:
-    u = await get_current_user(request)
-    if u.get("role") != "admin": raise HTTPException(403, "Admin only")
-    return u
-
-async def require_worker(request: Request) -> dict:
-    u = await get_current_user(request)
-    if u.get("role") != "worker": raise HTTPException(403, "Worker only")
-    return u
-
-# ─── Pydantic Models ───
-class LoginReq(BaseModel): email: Optional[str] = None; password: Optional[str] = None
-class DealerCreate(BaseModel): name: str; email: str; password: str; phone: str = ""; address: str = ""; credit_limit: float = 0
-class DealerUpdate(BaseModel): name: Optional[str] = None; phone: Optional[str] = None; address: Optional[str] = None; credit_limit: Optional[float] = None
-class WorkerCreate(BaseModel): name: str; email: str; password: str; phone: str = ""; specialty: str = ""
-class MaterialCreate(BaseModel): name: str; category: str = ""; category_id: Optional[int] = None; price_per_sqm: float; stock_quantity: float; unit: str = "kv.m"; description: str = ""; image_url: str = ""
-class MaterialUpdate(BaseModel): name: Optional[str] = None; category: Optional[str] = None; category_id: Optional[int] = None; price_per_sqm: Optional[float] = None; stock_quantity: Optional[float] = None; description: Optional[str] = None; image_url: Optional[str] = None
-class CategoryCreate(BaseModel): name: str; description: str = ""; image_url: str = ""
-class CategoryUpdate(BaseModel): name: Optional[str] = None; description: Optional[str] = None; image_url: Optional[str] = None
-class OrderItemCreate(BaseModel): material_id: str; material_name: str; width: float; height: float; quantity: int = 1; price_per_sqm: float; notes: str = ""
-
-async def get_current_user(request: Request) -> dict:
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "): 
+    if not auth.startswith("Bearer "):
         logger.error("Auth error: Missing or invalid Authorization header")
         raise HTTPException(401, "Not authenticated")
     try:
@@ -823,33 +765,33 @@ async def get_current_user(request: Request) -> dict:
         user_id_str = p.get("sub")
         if not user_id_str:
             raise HTTPException(401, "Invalid token format - please login again")
-            
         try:
             user_id = int(user_id_str)
-        except ValueError:
+        except (ValueError, TypeError):
             user_id = user_id_str
-            
+
         cache_key = f"user_auth_{user_id}"
         cached_user = cache.get(cache_key)
         if cached_user:
             return cached_user
-            
+
         db = await get_pool()
         row = await db.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
-        if not row: raise HTTPException(401, "User not found")
+        if not row:
+            raise HTTPException(401, "User not found")
         user = row_to_dict(row)
         user["id"] = str(user["id"])
         user.pop("password_hash", None)
-        
-        cache.set(cache_key, user, 60) # 1 minut xotirada saqlash
+        cache.set(cache_key, user, 60)
         return user
-    except jwt.ExpiredSignatureError: 
+    except jwt.ExpiredSignatureError:
         logger.error("Auth error: Token expired")
         raise HTTPException(401, "Token expired")
-    except jwt.InvalidTokenError as e: 
+    except jwt.InvalidTokenError as e:
         logger.error(f"Auth error: Invalid token {e}")
         raise HTTPException(401, "Invalid token")
-    except HTTPException: raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Auth error (other): {e}")
         raise HTTPException(401, "Authentication failed")
@@ -946,14 +888,14 @@ async def update_profile(request: Request, user: dict = Depends(get_current_user
     if not current_password:
         raise HTTPException(400, "Joriy parolni kiriting")
     db = await get_pool()
-    db_user = await db.fetchrow("SELECT * FROM users WHERE id = $1", int(user["id"]))
+    db_user = await db.fetchrow("SELECT * FROM users WHERE id::text = $1", str(user["id"]))
     if not db_user or not verify_password(current_password, db_user["password_hash"]):
         raise HTTPException(400, "Joriy parol noto'g'ri")
     updates = []
     params = []
     param_idx = 1
     if new_email and new_email != db_user["email"]:
-        existing = await db.fetchrow("SELECT id FROM users WHERE email = $1 AND id != $2", new_email, int(user["id"]))
+        existing = await db.fetchrow("SELECT id FROM users WHERE email = $1 AND id::text != $2", new_email, str(user["id"]))
         if existing:
             raise HTTPException(400, "Bu email allaqachon mavjud")
         updates.append(f"email = ${param_idx}")
@@ -967,9 +909,9 @@ async def update_profile(request: Request, user: dict = Depends(get_current_user
         param_idx += 1
     if not updates:
         raise HTTPException(400, "O'zgartirish yo'q")
-    params.append(int(user["id"]))
-    await db.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ${param_idx}", *params)
-    updated = await db.fetchrow("SELECT * FROM users WHERE id = $1", int(user["id"]))
+    params.append(str(user["id"]))
+    await db.execute(f"UPDATE users SET {', '.join(updates)} WHERE id::text = ${param_idx}", *params)
+    updated = await db.fetchrow("SELECT * FROM users WHERE id::text = $1", str(user["id"]))
     u = row_to_dict(updated)
     u["id"] = str(u["id"])
     u.pop("password_hash", None)
@@ -1610,9 +1552,14 @@ async def confirm_delivery(oid: str, admin: dict = Depends(require_admin)):
 async def send_message(data: MessageCreate, user: dict = Depends(get_current_user)):
     db = await get_pool()
     now = datetime.now(timezone.utc).isoformat()
+    try:
+        sender_id = int(user["id"])
+        receiver_id = int(data.receiver_id)
+    except (ValueError, TypeError):
+        raise HTTPException(400, "Noto'g'ri foydalanuvchi ID")
     row = await db.fetchrow(
         "INSERT INTO messages (sender_id, sender_name, sender_role, receiver_id, text, read, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
-        int(user["id"]), user.get("name", ""), user.get("role", ""), int(data.receiver_id), data.text, False, now
+        sender_id, user.get("name", ""), user.get("role", ""), receiver_id, data.text, False, now
     )
     m = row_to_dict(row)
     m["id"] = str(m["id"])
@@ -1624,9 +1571,14 @@ async def send_message(data: MessageCreate, user: dict = Depends(get_current_use
 @api_router.get("/messages/{pid}")
 async def get_messages(pid: str, user: dict = Depends(get_current_user)):
     db = await get_pool()
+    try:
+        my_id = int(user["id"])
+        partner_id = int(pid)
+    except (ValueError, TypeError):
+        raise HTTPException(400, "Noto'g'ri foydalanuvchi ID")
     rows = await db.fetch(
         "SELECT * FROM messages WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1) ORDER BY created_at ASC",
-        int(user["id"]), int(pid)
+        my_id, partner_id
     )
     out = []
     for r in rows:
@@ -1635,7 +1587,7 @@ async def get_messages(pid: str, user: dict = Depends(get_current_user)):
         m["sender_id"] = str(m["sender_id"])
         m["receiver_id"] = str(m["receiver_id"])
         out.append(m)
-    await db.execute("UPDATE messages SET read = TRUE WHERE sender_id = $1 AND receiver_id = $2 AND read = FALSE", int(pid), int(user["id"]))
+    await db.execute("UPDATE messages SET read = TRUE WHERE sender_id = $1 AND receiver_id = $2 AND read = FALSE", partner_id, my_id)
     return out
 
 @api_router.get("/chat/partners")
@@ -1648,13 +1600,19 @@ async def get_chat_partners(user: dict = Depends(get_current_user)):
             d = row_to_dict(r)
             d["id"] = str(d["id"])
             d.pop("password_hash", None)
+            try:
+                admin_int_id = int(user["id"])
+                dealer_int_id = int(r["id"])
+            except (ValueError, TypeError):
+                admin_int_id = user["id"]
+                dealer_int_id = r["id"]
             lm = await db.fetchrow(
                 "SELECT text, created_at FROM messages WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1) ORDER BY created_at DESC LIMIT 1",
-                int(user["id"]), r["id"]
+                admin_int_id, dealer_int_id
             )
             uc = await db.fetchval(
                 "SELECT COUNT(*) FROM messages WHERE sender_id = $1 AND receiver_id = $2 AND read = FALSE",
-                r["id"], int(user["id"])
+                dealer_int_id, admin_int_id
             )
             d["last_message"] = lm["text"] if lm else ""
             d["last_message_time"] = lm["created_at"] if lm else ""
@@ -1667,13 +1625,19 @@ async def get_chat_partners(user: dict = Depends(get_current_user)):
         a = row_to_dict(admin)
         a["id"] = str(a["id"])
         a.pop("password_hash", None)
+        try:
+            my_int_id = int(user["id"])
+            admin_int_id = int(admin["id"])
+        except (ValueError, TypeError):
+            my_int_id = user["id"]
+            admin_int_id = admin["id"]
         lm = await db.fetchrow(
             "SELECT text, created_at FROM messages WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1) ORDER BY created_at DESC LIMIT 1",
-            int(user["id"]), admin["id"]
+            my_int_id, admin_int_id
         )
         uc = await db.fetchval(
             "SELECT COUNT(*) FROM messages WHERE sender_id = $1 AND receiver_id = $2 AND read = FALSE",
-            admin["id"], int(user["id"])
+            admin_int_id, my_int_id
         )
         a["last_message"] = lm["text"] if lm else ""
         a["last_message_time"] = lm["created_at"] if lm else ""
@@ -1816,17 +1780,27 @@ async def create_tables(db):
     await db.execute("""
         CREATE TABLE IF NOT EXISTS user_settings (
             id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
             theme TEXT NOT NULL DEFAULT 'system',
             notifications BOOLEAN NOT NULL DEFAULT TRUE,
             created_at TEXT DEFAULT '',
             updated_at TEXT DEFAULT ''
         )
     """)
+    try:
+        await db.execute("ALTER TABLE user_settings ADD CONSTRAINT user_settings_user_id_unique UNIQUE (user_id)")
+    except Exception:
+        pass
 
 async def seed_admin(db):
     email = os.environ.get("ADMIN_EMAIL", "admin@curtain.uz")
-    pw = os.environ.get("ADMIN_PASSWORD", "admin123")
+    pw = os.environ.get("ADMIN_PASSWORD", "")
+    if not pw:
+        pw = "admin123"
+        logger.warning(
+            "ADMIN_PASSWORD env o'rnatilmagan! Default 'admin123' ishlatilmoqda. "
+            "Render → Environment → ADMIN_PASSWORD ni o'rnating."
+        )
     now = datetime.now(timezone.utc).isoformat()
     ex = await db.fetchrow("SELECT * FROM users WHERE email = $1", email)
     if not ex:
@@ -1897,16 +1871,16 @@ async def get_reports(admin: dict = Depends(require_admin)):
     month_ago = now - timedelta(days=30)
 
     weekly_revenue = await db.fetchval(
-        "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND status::text NOT IN ('rad_etilgan')", week_ago
+        "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND status::text NOT IN ('rad_etilgan')", week_ago.isoformat()
     )
     monthly_revenue = await db.fetchval(
-        "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND status::text NOT IN ('rad_etilgan')", month_ago
+        "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND status::text NOT IN ('rad_etilgan')", month_ago.isoformat()
     )
     total_revenue = await db.fetchval(
         "SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE status::text NOT IN ('rad_etilgan')"
     )
-    weekly_orders = await db.fetchval("SELECT COUNT(*) FROM orders WHERE created_at >= $1", week_ago)
-    monthly_orders = await db.fetchval("SELECT COUNT(*) FROM orders WHERE created_at >= $1", month_ago)
+    weekly_orders = await db.fetchval("SELECT COUNT(*) FROM orders WHERE created_at >= $1", week_ago.isoformat())
+    monthly_orders = await db.fetchval("SELECT COUNT(*) FROM orders WHERE created_at >= $1", month_ago.isoformat())
     total_orders = await db.fetchval("SELECT COUNT(*) FROM orders")
 
     # Top selling materials (from order items)
@@ -1971,8 +1945,8 @@ async def get_reports(admin: dict = Depends(require_admin)):
     for i in range(6, -1, -1):
         day_start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = (now - timedelta(days=i)).replace(hour=23, minute=59, second=59, microsecond=999999)
-        cnt = await db.fetchval("SELECT COUNT(*) FROM orders WHERE created_at >= $1 AND created_at <= $2", day_start, day_end)
-        rev = await db.fetchval("SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND created_at <= $2 AND status::text NOT IN ('rad_etilgan')", day_start, day_end)
+        cnt = await db.fetchval("SELECT COUNT(*) FROM orders WHERE created_at >= $1 AND created_at <= $2", day_start.isoformat(), day_end.isoformat())
+        rev = await db.fetchval("SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE created_at >= $1 AND created_at <= $2 AND status::text NOT IN ('rad_etilgan')", day_start.isoformat(), day_end.isoformat())
         day_label = (now - timedelta(days=i)).strftime("%d.%m")
         daily.append({"day": day_label, "orders": cnt, "revenue": round(float(rev), 2)})
 
@@ -2131,9 +2105,13 @@ async def health_check():
 @api_router.get("/settings/me")
 async def get_settings(user: dict = Depends(get_current_user)):
     db = await get_pool()
+    try:
+        uid = int(user["id"])
+    except (ValueError, TypeError):
+        uid = user["id"]
     row = await db.fetchrow(
         "SELECT theme, notifications, created_at, updated_at FROM user_settings WHERE user_id = $1",
-        int(user["id"]),
+        uid,
     )
     if not row:
         return {"theme": "system", "notifications": True}
@@ -2149,6 +2127,10 @@ async def update_settings(request: Request, user: dict = Depends(get_current_use
 
     db = await get_pool()
     now = datetime.now(timezone.utc).isoformat()
+    try:
+        uid = int(user["id"])
+    except (ValueError, TypeError):
+        uid = user["id"]
     row = await db.fetchrow(
         """
         INSERT INTO user_settings (user_id, theme, notifications, created_at, updated_at)
@@ -2157,7 +2139,7 @@ async def update_settings(request: Request, user: dict = Depends(get_current_use
         DO UPDATE SET theme = EXCLUDED.theme, notifications = EXCLUDED.notifications, updated_at = EXCLUDED.updated_at
         RETURNING theme, notifications, created_at, updated_at
         """,
-        int(user["id"]),
+        uid,
         theme,
         notifications,
         now,
@@ -2169,7 +2151,7 @@ async def update_settings(request: Request, user: dict = Depends(get_current_use
 async def save_push_token(req: PushTokenReq, user: dict = Depends(get_current_user)):
     db = await get_pool()
     if await column_exists(db, "users", "push_token"):
-        await db.execute("UPDATE users SET push_token = $1 WHERE id = $2", req.token, int(user["id"]))
+        await db.execute("UPDATE users SET push_token = $1 WHERE id::text = $2", req.token, str(user["id"]))
     elif await column_exists(db, "profiles", "push_token"):
         await db.execute("UPDATE profiles SET push_token = $1 WHERE id::text = $2", req.token, str(user["id"]))
     return {"message": "Push token saqlandi", "token": req.token}
@@ -2194,7 +2176,7 @@ async def startup():
     pool = await asyncpg.create_pool(DATABASE_URL, **asyncpg_pool_kwargs())
     async with pool.acquire() as conn:
         await create_tables(conn)
-        # await create_indexes(conn)
+        await create_indexes(conn)
         await seed_admin(conn)
     asyncio.create_task(keep_alive_task())
     logger.info("Muvaffaqiyat: API tayyor, PostgreSQL ulandi, keep-alive yoqildi (bu xato emas).")

@@ -86,7 +86,7 @@ export default function NewOrder() {
     else { setExpandedId(matId); setWidth(''); setHeight(''); }
   };
 
-  const filteredMats = selectedCat ? materials.filter(m => m.category_id === selectedCat.id) : materials;
+  const filteredMats = selectedCat ? materials.filter(m => String(m.category_id) === String(selectedCat.id)) : materials;
 
   if (loading) return <SafeAreaView style={s.c}><ActivityIndicator size="large" color="#fff" style={{ flex: 1 }} /></SafeAreaView>;
 

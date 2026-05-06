@@ -58,12 +58,7 @@ function AuthGuard() {
     setIsValidating(true);
     void (async () => {
       try {
-        const refreshed = await AuthService.refreshSession();
-        if (!cancelled && !refreshed) {
-          // Only clear session on hard 401, not on network errors.
-          // AuthService.refreshSession already returns token on network hiccup.
-          console.log('[AuthGuard] Session invalid – clearing and going to login');
-        }
+        await AuthService.refreshSession();
       } finally {
         if (!cancelled) setIsValidating(false);
       }
@@ -86,7 +81,6 @@ function AuthGuard() {
 
     if (!user || !token) {
       if (inProtected) {
-        console.log('[AuthGuard] No auth, → login');
         router.replace('/' as never);
       }
       return;
@@ -99,7 +93,6 @@ function AuthGuard() {
           : user.role === 'worker'
             ? '/worker/tasks'
             : '/dealer/dashboard';
-      console.log('[AuthGuard] Logged in → ', dest);
       router.replace(dest as never);
     }
   }, [currentSegment, isHydrated, isLoading, isValidating, router, token, user]);

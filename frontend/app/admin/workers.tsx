@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus, X, UserCheck, CheckCircle, Hash, Truck, Clock } from 'lucide-react-native';
 import { api } from '../../src/services/apiClient';
@@ -38,10 +38,50 @@ export default function AdminWorkers() {
     }
   }, []);
   useEffect(() => { fetchAll(); }, [fetchAll]);
-  const addWorker = async () => { if (!wForm.name || !wForm.email || !wForm.password) return; try { await api('/workers', { method: 'POST', body: JSON.stringify(wForm) }); setShowAddWorker(false); setWForm({ name: '', email: '', password: '', phone: '', specialty: '' }); fetchAll(); } catch (e) { console.error(e); } };
-  const assignItem = async (orderId: string, itemIdx: number, workerId: string) => { try { await api(`/orders/${orderId}/items/${itemIdx}/assign`, { method: 'PUT', body: JSON.stringify({ worker_id: workerId }) }); fetchAll(); } catch (e) { console.error(e); } };
-  const assignDelivery = async () => { if (!selectedOrder || !dForm.driver_name) return; try { await api(`/orders/${selectedOrder.id}/delivery`, { method: 'PUT', body: JSON.stringify(dForm) }); setShowDelivery(false); setDForm({ driver_name: '', driver_phone: '', plate_number: '' }); fetchAll(); } catch (e) { console.error(e); } };
-  const confirmDelivery = async (orderId: string) => { try { await api(`/orders/${orderId}/confirm-delivery`, { method: 'PUT' }); fetchAll(); } catch (e) { console.error(e); } };
+  const addWorker = async () => {
+    if (!wForm.name || !wForm.email || !wForm.password) {
+      Alert.alert('Xatolik', 'Ism, email va parol majburiy');
+      return;
+    }
+    try {
+      await api('/workers', { method: 'POST', body: JSON.stringify(wForm) });
+      setShowAddWorker(false);
+      setWForm({ name: '', email: '', password: '', phone: '', specialty: '' });
+      fetchAll();
+    } catch (e: any) {
+      Alert.alert('Xatolik', e?.message || 'Ishchi qo\'shilmadi');
+    }
+  };
+  const assignItem = async (orderId: string, itemIdx: number, workerId: string) => {
+    try {
+      await api(`/orders/${orderId}/items/${itemIdx}/assign`, { method: 'PUT', body: JSON.stringify({ worker_id: workerId }) });
+      fetchAll();
+    } catch (e: any) {
+      Alert.alert('Xatolik', e?.message || 'Biriktirishda xatolik');
+    }
+  };
+  const assignDelivery = async () => {
+    if (!selectedOrder || !dForm.driver_name) {
+      Alert.alert('Xatolik', 'Haydovchi ismini kiriting');
+      return;
+    }
+    try {
+      await api(`/orders/${selectedOrder.id}/delivery`, { method: 'PUT', body: JSON.stringify(dForm) });
+      setShowDelivery(false);
+      setDForm({ driver_name: '', driver_phone: '', plate_number: '' });
+      fetchAll();
+    } catch (e: any) {
+      Alert.alert('Xatolik', e?.message || 'Yetkazish biriktirilmadi');
+    }
+  };
+  const confirmDelivery = async (orderId: string) => {
+    try {
+      await api(`/orders/${orderId}/confirm-delivery`, { method: 'PUT' });
+      fetchAll();
+    } catch (e: any) {
+      Alert.alert('Xatolik', e?.message || 'Tasdiqlashda xatolik');
+    }
+  };
   const sc = (status: string) => (c as any)[statusColorKeys[status] || 'textSec'];
 
   if (loading) return <SafeAreaView style={[s.c, { backgroundColor: c.bg }]}><ActivityIndicator size="large" color={c.accent} style={{ flex: 1 }} /></SafeAreaView>;
@@ -65,7 +105,15 @@ export default function AdminWorkers() {
               <View style={s.cardRow}>
                 <View style={[s.avatar, { backgroundColor: c.accentSoft }]}><Text style={{ fontSize: 18, fontWeight: '700', color: c.accent }}>{w.name?.charAt(0)}</Text></View>
                 <View style={{ flex: 1 }}><Text style={{ fontSize: 16, fontWeight: '600', color: c.text }}>{w.name}</Text><Text style={{ fontSize: 12, color: c.textSec, marginTop: 1 }}>{w.email}</Text>{w.specialty ? <Text style={{ fontSize: 11, color: c.warning, marginTop: 2, fontWeight: '500' }}>{w.specialty}</Text> : null}</View>
-                <TouchableOpacity onPress={async () => { await api(`/workers/${w.id}`, { method: 'DELETE' }); fetchAll(); }} style={[s.delBtn, { backgroundColor: c.inputBg }]}><X size={14} color={c.textTer} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => {
+                    Alert.alert("O'chirish", `${w.name} ni o'chirishni xohlaysizmi?`, [
+                      { text: 'Bekor', style: 'cancel' },
+                      { text: "O'chirish", style: 'destructive', onPress: async () => {
+                        try { await api(`/workers/${w.id}`, { method: 'DELETE' }); fetchAll(); }
+                        catch (e: any) { Alert.alert('Xatolik', e?.message || 'O\'chirishda xatolik'); }
+                      }},
+                    ]);
+                  }} style={[s.delBtn, { backgroundColor: c.inputBg }]}><X size={14} color={c.textTer} /></TouchableOpacity>
               </View>
             </View>
           ))}

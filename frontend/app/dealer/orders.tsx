@@ -40,6 +40,7 @@ export default function DealerOrders() {
 
   const allStatuses = ['kutilmoqda', 'tasdiqlangan', 'tayyorlanmoqda', 'tayyor', 'yetkazilmoqda', 'yetkazildi'];
   const filteredOrders = orders.filter((order) => {
+    if (order.status === 'rad_etilgan') return true;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return (
