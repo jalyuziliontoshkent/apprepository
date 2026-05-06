@@ -1282,13 +1282,15 @@ async def create_order(data: OrderCreate, user: dict = Depends(get_current_user)
                 raw_id = dealer_ids[0]
                 if dealer_id_udt in {"int2", "int4", "int8"} and raw_id.lstrip("-").isdigit():
                     dealer_ref = int(raw_id)
+                elif dealer_id_udt == "uuid":
+                    # UUID column: UUID formatdagi ID qidirish, yo'q bo'lsa NULL
+                    uuid_val = next((v for v in dealer_ids if "-" in v and len(v) == 36), None)
+                    dealer_ref = uuid_val  # None bo'lsa dealer_id yozilmaydi
                 else:
-                    # UUID yoki TEXT column uchun string sifatida beramiz
                     dealer_ref = raw_id
             else:
                 dealer_ref = None
-            if await column_exists(conn, "orders", "dealer_id") and dealer_ref is None:
-                raise HTTPException(400, "Diler profili topilmadi. Admin diler akkauntini qayta yaratib ko'ring.")
+            # dealer_id NULL bo'lsa ham buyurtma yaratiladi - dealer_name orqali aniqlanadi
 
             if await column_exists(conn, "orders", "items"):
                 order_values = await filter_existing_fields(conn, "orders", {
@@ -1365,9 +1367,16 @@ async def list_orders(user: dict = Depends(get_current_user)):
     db = await get_pool()
     if user.get("role") == "dealer":
         actor_ids = await resolve_actor_ids(db, user)
+        # dealer_id bo'yicha yoki dealer_name bo'yicha filter
         rows = await db.fetch(
-            "SELECT * FROM orders WHERE dealer_id::text = ANY($1::text[]) ORDER BY created_at DESC",
+            """
+            SELECT * FROM orders
+            WHERE dealer_id::text = ANY($1::text[])
+               OR dealer_name = $2
+            ORDER BY created_at DESC
+            """,
             actor_ids,
+            str(user.get("name", "")),
         )
     elif user.get("role") == "worker" and await column_exists(db, "orders", "worker_id"):
         actor_ids = await resolve_actor_ids(db, user)
