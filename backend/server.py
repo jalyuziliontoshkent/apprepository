@@ -1274,21 +1274,22 @@ async def create_order(data: OrderCreate, user: dict = Depends(get_current_user)
             status_value = await normalize_status_for_db(conn, "kutilmoqda")
             dealer_ids = await resolve_actor_ids(conn, user)
             dealer_id_udt = await column_udt_name(conn, "orders", "dealer_id")
-            dealer_ref = pick_reference_value(dealer_ids, dealer_id_udt)
-            # dealer_ref None bo'lsa - integer ID ni to'g'ridan-to'g'ri ishlatamiz
-            if dealer_ref is None and dealer_ids:
+            # Har qanday tip uchun ishlaydi: INTEGER, UUID, TEXT
+            if dealer_ids:
                 raw_id = dealer_ids[0]
-                if raw_id.lstrip("-").isdigit():
+                if dealer_id_udt in {"int2", "int4", "int8"} and raw_id.lstrip("-").isdigit():
                     dealer_ref = int(raw_id)
                 else:
+                    # UUID yoki TEXT column uchun string sifatida beramiz
                     dealer_ref = raw_id
+            else:
+                dealer_ref = None
             if await column_exists(conn, "orders", "dealer_id") and dealer_ref is None:
                 raise HTTPException(400, "Diler profili topilmadi. Admin diler akkauntini qayta yaratib ko'ring.")
 
             if await column_exists(conn, "orders", "items"):
                 order_values = await filter_existing_fields(conn, "orders", {
                     "order_code": order_code,
-                    "dealer_id": dealer_ref,
                     "dealer_name": user.get("name", ""),
                     "items": json.dumps(items),
                     "total_sqm": round_money(total_sqm),
@@ -1300,12 +1301,14 @@ async def create_order(data: OrderCreate, user: dict = Depends(get_current_user)
                     "created_at": now,
                     "updated_at": now,
                 })
+                # dealer_id ni alohida qo'shamiz - tip mosligini ta'minlash uchun
+                if await column_exists(conn, "orders", "dealer_id") and dealer_ref is not None:
+                    order_values["dealer_id"] = dealer_ref
                 sql, params = build_insert_statement("orders", order_values)
                 row = await conn.fetchrow(sql, *params)
             else:
                 order_values = await filter_existing_fields(conn, "orders", {
                     "order_code": order_code,
-                    "dealer_id": dealer_ref,
                     "dealer_name": user.get("name", ""),
                     "total_sqm": round_money(total_sqm),
                     "total_price": round_money(total_price),
@@ -1314,6 +1317,8 @@ async def create_order(data: OrderCreate, user: dict = Depends(get_current_user)
                     "created_at": now,
                     "updated_at": now,
                 })
+                if await column_exists(conn, "orders", "dealer_id") and dealer_ref is not None:
+                    order_values["dealer_id"] = dealer_ref
                 sql, params = build_insert_statement("orders", order_values)
                 row = await conn.fetchrow(sql, *params)
 
