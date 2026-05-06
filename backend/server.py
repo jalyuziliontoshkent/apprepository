@@ -1273,7 +1273,15 @@ async def create_order(data: OrderCreate, user: dict = Depends(get_current_user)
         async with conn.transaction():
             status_value = await normalize_status_for_db(conn, "kutilmoqda")
             dealer_ids = await resolve_actor_ids(conn, user)
-            dealer_ref = pick_reference_value(dealer_ids, await column_udt_name(conn, "orders", "dealer_id"))
+            dealer_id_udt = await column_udt_name(conn, "orders", "dealer_id")
+            dealer_ref = pick_reference_value(dealer_ids, dealer_id_udt)
+            # dealer_ref None bo'lsa - integer ID ni to'g'ridan-to'g'ri ishlatamiz
+            if dealer_ref is None and dealer_ids:
+                raw_id = dealer_ids[0]
+                if raw_id.lstrip("-").isdigit():
+                    dealer_ref = int(raw_id)
+                else:
+                    dealer_ref = raw_id
             if await column_exists(conn, "orders", "dealer_id") and dealer_ref is None:
                 raise HTTPException(400, "Diler profili topilmadi. Admin diler akkauntini qayta yaratib ko'ring.")
 
