@@ -1277,82 +1277,55 @@ async def create_order(data: OrderCreate, user: dict = Depends(get_current_user)
     async with pool.acquire() as conn:
         async with conn.transaction():
             status_value = await normalize_status_for_db(conn, "kutilmoqda")
-            dealer_ids = await resolve_actor_ids(conn, user)
-            dealer_id_udt = await column_udt_name(conn, "orders", "dealer_id")
-            dealer_ref = None
-            if dealer_ids:
-                raw_id = dealer_ids[0]
-                if dealer_id_udt in {"int2", "int4", "int8"} and raw_id.lstrip("-").isdigit():
-                    dealer_ref = int(raw_id)
-                elif dealer_id_udt == "uuid":
-                    # users.id INTEGER, orders.dealer_id UUID - mos kelmaydi, NULL qoldiramiz
-                    dealer_ref = None
-                elif dealer_id_udt in {"text", "varchar"}:
-                    dealer_ref = raw_id
-            # dealer_ref None bo'lsa dealer_id yozilmaydi - dealer_name orqali ishlaydi
+            now_dt = datetime.now(timezone.utc)
 
-            if await column_exists(conn, "orders", "items"):
-                order_values = await filter_existing_fields(conn, "orders", {
-                    "order_code": order_code,
-                    "dealer_name": user.get("name", ""),
-                    "items": json.dumps(items),
-                    "total_sqm": round_money(total_sqm),
-                    "total_price": round_money(total_price),
-                    "status": status_value,
-                    "notes": data.notes,
-                    "rejection_reason": "",
-                    "delivery_info": None,
-                    "created_at": now,
-                    "updated_at": now,
-                })
-                # dealer_id ni alohida qo'shamiz - tip mosligini ta'minlash uchun
-                if await column_exists(conn, "orders", "dealer_id") and dealer_ref is not None:
-                    order_values["dealer_id"] = dealer_ref
-                sql, params = build_insert_statement("orders", order_values)
-                row = await conn.fetchrow(sql, *params)
-            else:
-                order_values = await filter_existing_fields(conn, "orders", {
-                    "order_code": order_code,
-                    "dealer_name": user.get("name", ""),
-                    "total_sqm": round_money(total_sqm),
-                    "total_price": round_money(total_price),
-                    "status": status_value,
-                    "notes": data.notes,
-                    "created_at": now,
-                    "updated_at": now,
-                })
-                if await column_exists(conn, "orders", "dealer_id") and dealer_ref is not None:
-                    order_values["dealer_id"] = dealer_ref
-                sql, params = build_insert_statement("orders", order_values)
-                row = await conn.fetchrow(sql, *params)
+            order_values = await filter_existing_fields(conn, "orders", {
+                "order_code": order_code,
+                "dealer_id": None,  # UUID column, users.id INTEGER - skip
+                "dealer_name": user.get("name", ""),
+                "items": json.dumps(items),
+                "total_sqm": round_money(total_sqm),
+                "total_price": round_money(total_price),
+                "status": status_value,
+                "notes": data.notes,
+                "rejection_reason": "",
+                "delivery_info": None,
+                "inventory_deducted": False,
+                "created_at": now_dt,
+                "updated_at": now_dt,
+            })
+            # dealer_id ni olib tashlaymiz - UUID/INTEGER mos kelmaydi
+            order_values.pop("dealer_id", None)
 
-                if await table_exists(conn, "order_items"):
-                    material_udt = await column_udt_name(conn, "order_items", "material_id")
-                    for item_index, item in enumerate(items):
-                        item_values = await filter_existing_fields(conn, "order_items", {
-                            "order_id": row["id"],
-                            "material_id": pick_reference_value([item["material_id"]], material_udt),
-                            "material_name": item["material_name"],
-                            "width": item["width"],
-                            "height": item["height"],
-                            "quantity": item.get("quantity", 1),
-                            "sqm": item["sqm"],
-                            "unit_price": item["price_per_sqm"],
-                            "total_price": item["price"],
-                            "notes": item.get("notes", ""),
-                            "worker_status": "pending",
-                            "item_index": item_index,
-                            "created_at": now,
-                            "updated_at": now,
-                        })
-                        sql, params = build_insert_statement("order_items", item_values)
-                        await conn.fetchrow(sql, *params)
+            sql, params = build_insert_statement("orders", order_values)
+            row = await conn.fetchrow(sql, *params)
 
-            if await table_exists(conn, "users") and await column_exists(conn, "users", "debt"):
+            # order_items jadvaliga yozamiz (agar items column yo'q bo'lsa)
+            if not await column_exists(conn, "orders", "items") and await table_exists(conn, "order_items"):
+                material_udt = await column_udt_name(conn, "order_items", "material_id")
+                for item_index, item in enumerate(items):
+                    item_values = await filter_existing_fields(conn, "order_items", {
+                        "order_id": row["id"],
+                        "material_id": pick_reference_value([item["material_id"]], material_udt),
+                        "material_name": item["material_name"],
+                        "width": item["width"],
+                        "height": item["height"],
+                        "sqm": item["sqm"],
+                        "unit_price": item["price_per_sqm"],
+                        "total_price": item["price"],
+                        "notes": item.get("notes", ""),
+                        "worker_status": "pending",
+                        "item_index": item_index,
+                        "created_at": now_dt,
+                        "updated_at": now_dt,
+                    })
+                    isql, iparams = build_insert_statement("order_items", item_values)
+                    await conn.fetchrow(isql, *iparams)
+
+            if await column_exists(conn, "users", "debt"):
                 await conn.execute(
                     "UPDATE users SET debt = COALESCE(debt, 0) + $1 WHERE id::text = $2",
-                    round_money(total_price),
-                    str(user["id"]),
+                    round_money(total_price), str(user["id"]),
                 )
 
     cache.invalidate("orders", "stats", "reports")
