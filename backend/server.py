@@ -2186,7 +2186,19 @@ async def debug_schema(admin: dict = Depends(require_admin)):
           AND table_name IN ('orders', 'users', 'materials', 'categories', 'order_items')
         ORDER BY table_name, column_name
     """)
-    return [{"table": r["table_name"], "column": r["column_name"], "udt": r["udt_name"]} for r in rows]
+    schema = [{"table": r["table_name"], "column": r["column_name"], "udt": r["udt_name"]} for r in rows]
+
+    enums = await db.fetch("""
+        SELECT t.typname, e.enumlabel
+        FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid
+        WHERE t.typname IN ('order_status', 'worker_item_status')
+        ORDER BY t.typname, e.enumsortorder
+    """)
+    enum_data = {}
+    for r in enums:
+        enum_data.setdefault(r["typname"], []).append(r["enumlabel"])
+
+    return {"schema": schema, "enums": enum_data}
 
 @api_router.get("/settings/me")
 async def get_settings(user: dict = Depends(get_current_user)):
