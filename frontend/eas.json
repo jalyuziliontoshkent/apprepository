@@ -10,7 +10,7 @@
       "environment": "development",
       "env": {
         "EAS_BUILD_NO_EXPO_GO_WARNING": "true",
-        "EXPO_PUBLIC_BACKEND_URL": "https://lion-blinds-backend.onrender.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://lion-blinds-backend1.onrender.com"
       },
       "android": {
         "buildType": "apk"
@@ -24,7 +24,7 @@
       "environment": "preview",
       "env": {
         "EAS_BUILD_NO_EXPO_GO_WARNING": "true",
-        "EXPO_PUBLIC_BACKEND_URL": "https://lion-blinds-backend.onrender.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://lion-blinds-backend1.onrender.com"
       },
       "android": {
         "buildType": "apk"
@@ -50,7 +50,7 @@
       "autoIncrement": true,
       "env": {
         "EAS_BUILD_NO_EXPO_GO_WARNING": "true",
-        "EXPO_PUBLIC_BACKEND_URL": "https://lion-blinds-backend.onrender.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://lion-blinds-backend1.onrender.com"
       },
       "android": {
         "buildType": "apk"
@@ -61,7 +61,7 @@
       "environment": "production",
       "env": {
         "EAS_BUILD_NO_EXPO_GO_WARNING": "true",
-        "EXPO_PUBLIC_BACKEND_URL": "https://lion-blinds-backend.onrender.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://lion-blinds-backend1.onrender.com"
       },
       "autoIncrement": true,
       "android": {

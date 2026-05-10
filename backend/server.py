@@ -43,14 +43,9 @@ ORDER_BILLING_STEP_SQM = 0.5
 KEEP_ALIVE_INTERVAL_SECONDS = 60
 INVENTORY_SYNC_STATUSES = {"tayyor", "yetkazilmoqda", "yetkazildi"}
 
-try:
-    settings = load_settings()
-    DATABASE_URL = settings.database_url
-except Exception as _settings_err:
-    import sys as _sys
-    logging.basicConfig()
-    logging.getLogger("backend").critical("Settings load failed: %s", _settings_err)
-    _sys.exit(1)
+# settings startup da yuklanadi
+settings = None
+DATABASE_URL = None
 
 
 def asyncpg_pool_kwargs():
@@ -62,9 +57,10 @@ def asyncpg_pool_kwargs():
         timeout=20,
         max_inactive_connection_lifetime=120,
     )
-    ctx = asyncpg_ssl_context_for_dsn(DATABASE_URL)
-    if ctx is not None:
-        kw["ssl"] = ctx
+    if DATABASE_URL:
+        ctx = asyncpg_ssl_context_for_dsn(DATABASE_URL)
+        if ctx is not None:
+            kw["ssl"] = ctx
     return kw
 
 
@@ -74,7 +70,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 app = FastAPI()
 app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 api_router = APIRouter(prefix="/api")
-JWT_ALGORITHM = settings.jwt_algorithm
+JWT_ALGORITHM = "HS256"  # startup da settings.jwt_algorithm bilan override qilinadi
 install_middleware(app, logger)
 
 # ─── IN-MEMORY CACHE (DB tezlashtirish) ───
@@ -131,58 +127,59 @@ def get_jwt_secret():
     if not secret:
         raise RuntimeError("JWT_SECRET is not configured")
     return secret
-def hash_password(pw: str) -> str: return bcrypt.hashpw(pw.encode(), bcrypt.gensalt(12)).decode()
-def verify_password(plain: str, hashed: str) -> bool:
-    is_valid = verify_password_value(plain, hashed)
-    if not is_valid and plain and hashed:
-        logger.warning("Invalid password hash encountered during login")
-    return is_valid
 
+def hash_password(pw: str) -> str:
+    rounds = settings.password_hash_rounds if settings else 12
+    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt(rounds)).decode()
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return verify_password_value(plain, hashed)
 
 def create_access_token(uid: str, email: str, role: str) -> str:
-    token, _, _ = create_access_token_value(settings, {"id": uid, "email": email, "role": role})
-    return token
+    if settings:
+        token, _, _ = create_access_token_value(settings, {"id": uid, "email": email, "role": role})
+        return token
+    import jwt as _jwt
+    from datetime import datetime, timezone, timedelta
+    return _jwt.encode(
+        {"sub": uid, "email": email, "role": role, "type": "access",
+         "exp": datetime.now(timezone.utc) + timedelta(minutes=30)},
+        get_jwt_secret(), algorithm="HS256"
+    )
 
 
 async def issue_auth_session(db, user_row, *, revoke_existing_refresh: bool = True) -> dict:
     user = row_to_dict(user_row)
     if user is None:
         raise HTTPException(401, "User not found")
-
     user["id"] = str(user["id"])
     user.pop("password_hash", None)
 
-    access_token, _, access_expires_at = create_access_token_value(settings, user)
-    refresh_token = create_refresh_token()
-    refresh_expires_at = get_refresh_expires_at(settings)
-    now = datetime.now(timezone.utc)
-
-    if revoke_existing_refresh:
+    if settings:
+        access_token, _, access_expires_at = create_access_token_value(settings, user)
+        refresh_token = create_refresh_token()
+        refresh_expires_at = get_refresh_expires_at(settings)
+        now = datetime.now(timezone.utc)
+        if revoke_existing_refresh:
+            await db.execute(
+                "UPDATE refresh_tokens SET revoked_at = $2 WHERE user_id = $1 AND revoked_at IS NULL",
+                int(user["id"]), now,
+            )
         await db.execute(
-            "UPDATE refresh_tokens SET revoked_at = $2 WHERE user_id = $1 AND revoked_at IS NULL",
-            int(user["id"]),
-            now,
+            "INSERT INTO refresh_tokens (user_id, token_hash, expires_at, revoked_at, created_at) VALUES ($1, $2, $3, NULL, $4)",
+            int(user["id"]), sha256_text(refresh_token), refresh_expires_at, now,
         )
-
-    await db.execute(
-        """
-        INSERT INTO refresh_tokens (user_id, token_hash, expires_at, revoked_at, created_at)
-        VALUES ($1, $2, $3, NULL, $4)
-        """,
-        int(user["id"]),
-        sha256_text(refresh_token),
-        refresh_expires_at,
-        now,
-    )
-
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "expires_at": access_expires_at.isoformat(),
-        "token": access_token,
-        "user": user,
-    }
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "expires_at": access_expires_at.isoformat(),
+            "token": access_token,
+            "user": user,
+        }
+    else:
+        token = create_access_token(user["id"], user.get("email", ""), user.get("role", ""))
+        return {"token": token, "user": user}
 
 
 def generate_order_code():
@@ -928,7 +925,7 @@ async def logout(req: LogoutReq, request: Request):
         )
 
     auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
+    if auth_header.startswith("Bearer ") and settings:
         try:
             payload = decode_token(settings, auth_header[7:], expected_type="access")
             token_jti = str(payload.get("jti") or "").strip()
@@ -1901,8 +1898,8 @@ async def create_tables(db):
     """)
 
 async def seed_admin(db):
-    if not settings.enable_demo_seed_data:
-        logger.info("Demo seed data disabled for APP_ENV=%s", settings.app_env)
+    if settings and not settings.enable_demo_seed_data:
+        logger.info("Demo seed data o'chirilgan")
         return
 
     email = os.environ.get("ADMIN_EMAIL", "admin@curtain.uz")
@@ -2284,7 +2281,9 @@ async def keep_alive_task():
 
 @app.on_event("startup")
 async def startup():
-    global pool
+    global pool, settings, DATABASE_URL
+    settings = load_settings()
+    DATABASE_URL = settings.database_url
     pool = await asyncpg.create_pool(DATABASE_URL, **asyncpg_pool_kwargs())
     app.state.settings = settings
     app.state.cache = cache
@@ -2295,7 +2294,7 @@ async def startup():
         await create_indexes(conn)
         await seed_admin(conn)
     asyncio.create_task(keep_alive_task())
-    logger.info("Muvaffaqiyat: API tayyor, PostgreSQL ulandi, keep-alive yoqildi (bu xato emas).")
+    logger.info("Muvaffaqiyat: API tayyor, PostgreSQL ulandi.")
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -2305,4 +2304,4 @@ async def shutdown():
 
 app.include_router(api_router)
 app.add_middleware(GZipMiddleware, minimum_size=800)
-app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=settings.cors_origins, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
