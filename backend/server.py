@@ -2211,6 +2211,19 @@ async def health_check():
             content={"status": "error", "database": str(e), "latency_ms": latency_ms},
         )
 
+@api_router.get("/debug/schema", include_in_schema=False)
+async def debug_schema(admin: dict = Depends(require_admin)):
+    db = await get_pool()
+    rows = await db.fetch("""
+        SELECT table_name, column_name, udt_name, data_type
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name IN ('orders', 'users', 'materials', 'categories')
+          AND column_name IN ('id', 'dealer_id', 'worker_id', 'category_id', 'material_id')
+        ORDER BY table_name, column_name
+    """)
+    return [{"table": r["table_name"], "column": r["column_name"], "udt": r["udt_name"], "type": r["data_type"]} for r in rows]
+
 @api_router.get("/settings/me")
 async def get_settings(user: dict = Depends(get_current_user)):
     db = await get_pool()
