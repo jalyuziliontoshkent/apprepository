@@ -17,8 +17,8 @@ def _get_required_env(name: str) -> str:
 
 def _get_jwt_secret() -> str:
     value = _get_required_env("JWT_SECRET")
-    if len(value) < 32:
-        raise RuntimeError("JWT_SECRET kamida 32 belgidan iborat bo'lishi kerak")
+    if len(value) < 16:
+        raise RuntimeError("JWT_SECRET kamida 16 belgidan iborat bo'lishi kerak")
     return value
 
 

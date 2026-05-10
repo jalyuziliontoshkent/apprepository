@@ -43,9 +43,14 @@ ORDER_BILLING_STEP_SQM = 0.5
 KEEP_ALIVE_INTERVAL_SECONDS = 60
 INVENTORY_SYNC_STATUSES = {"tayyor", "yetkazilmoqda", "yetkazildi"}
 
-
-settings = load_settings()
-DATABASE_URL = settings.database_url
+try:
+    settings = load_settings()
+    DATABASE_URL = settings.database_url
+except Exception as _settings_err:
+    import sys as _sys
+    logging.basicConfig()
+    logging.getLogger("backend").critical("Settings load failed: %s", _settings_err)
+    _sys.exit(1)
 
 
 def asyncpg_pool_kwargs():
