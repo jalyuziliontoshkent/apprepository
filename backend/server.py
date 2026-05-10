@@ -2210,11 +2210,10 @@ async def debug_schema(admin: dict = Depends(require_admin)):
         SELECT table_name, column_name, udt_name, data_type
         FROM information_schema.columns
         WHERE table_schema = 'public'
-          AND table_name IN ('orders', 'users', 'materials', 'categories')
-          AND column_name IN ('id', 'dealer_id', 'worker_id', 'category_id', 'material_id')
+          AND table_name IN ('orders', 'users', 'materials', 'categories', 'order_items')
         ORDER BY table_name, column_name
     """)
-    return [{"table": r["table_name"], "column": r["column_name"], "udt": r["udt_name"], "type": r["data_type"]} for r in rows]
+    return [{"table": r["table_name"], "column": r["column_name"], "udt": r["udt_name"]} for r in rows]
 
 @api_router.get("/settings/me")
 async def get_settings(user: dict = Depends(get_current_user)):
