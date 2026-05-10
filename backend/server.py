@@ -1285,10 +1285,11 @@ async def create_order(data: OrderCreate, user: dict = Depends(get_current_user)
                 if dealer_id_udt in {"int2", "int4", "int8"} and raw_id.lstrip("-").isdigit():
                     dealer_ref = int(raw_id)
                 elif dealer_id_udt == "uuid":
-                    dealer_ref = next((v for v in dealer_ids if "-" in v and len(v) == 36), None)
+                    # users.id INTEGER, orders.dealer_id UUID - mos kelmaydi, NULL qoldiramiz
+                    dealer_ref = None
                 elif dealer_id_udt in {"text", "varchar"}:
                     dealer_ref = raw_id
-                # dealer_ref None bo'lsa dealer_id yozilmaydi - dealer_name orqali ishlaydi
+            # dealer_ref None bo'lsa dealer_id yozilmaydi - dealer_name orqali ishlaydi
 
             if await column_exists(conn, "orders", "items"):
                 order_values = await filter_existing_fields(conn, "orders", {
@@ -1364,16 +1365,8 @@ async def list_orders(user: dict = Depends(get_current_user)):
     if cached: return cached
     db = await get_pool()
     if user.get("role") == "dealer":
-        actor_ids = await resolve_actor_ids(db, user)
-        # dealer_id bo'yicha yoki dealer_name bo'yicha filter
         rows = await db.fetch(
-            """
-            SELECT * FROM orders
-            WHERE dealer_id::text = ANY($1::text[])
-               OR dealer_name = $2
-            ORDER BY created_at DESC
-            """,
-            actor_ids,
+            "SELECT * FROM orders WHERE dealer_name = $1 ORDER BY created_at DESC",
             str(user.get("name", "")),
         )
     elif user.get("role") == "worker" and await column_exists(db, "orders", "worker_id"):
@@ -1393,12 +1386,11 @@ async def get_order(oid: str, user: dict = Depends(get_current_user)):
     db = await get_pool()
     o = await fetch_order_row(db, oid)
     if not o: raise HTTPException(404, "Not found")
-    o = await serialize_order(db, o)
+    o_dict = await serialize_order(db, o)
     if user.get("role") == "dealer":
-        actor_ids = await resolve_actor_ids(db, user)
-        if str(o["dealer_id"]) not in actor_ids:
+        if not o_dict or o_dict.get("dealer_name") != user.get("name", ""):
             raise HTTPException(403)
-    return o
+    return o_dict
 
 @api_router.put("/orders/{oid}/status")
 async def update_order_status(oid: str, data: OrderStatusUpdate, admin: dict = Depends(require_admin)):
