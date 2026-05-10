@@ -1279,9 +1279,10 @@ async def create_order(data: OrderCreate, user: dict = Depends(get_current_user)
             status_value = await normalize_status_for_db(conn, "kutilmoqda")
             now_dt = datetime.now(timezone.utc)
 
+            # Faqat mavjud columnlarni yozamiz
             order_values = await filter_existing_fields(conn, "orders", {
                 "order_code": order_code,
-                "dealer_id": None,  # UUID column, users.id INTEGER - skip
+                "dealer_id": None,
                 "dealer_name": user.get("name", ""),
                 "items": json.dumps(items),
                 "total_sqm": round_money(total_sqm),
@@ -1296,12 +1297,16 @@ async def create_order(data: OrderCreate, user: dict = Depends(get_current_user)
             })
             # dealer_id ni olib tashlaymiz - UUID/INTEGER mos kelmaydi
             order_values.pop("dealer_id", None)
+            order_values.pop("dealer_name", None)  # agar column yo'q bo'lsa
+
+            if not order_values:
+                raise HTTPException(500, "orders jadvalida yozish uchun column topilmadi")
 
             sql, params = build_insert_statement("orders", order_values)
             row = await conn.fetchrow(sql, *params)
 
-            # order_items jadvaliga yozamiz (agar items column yo'q bo'lsa)
-            if not await column_exists(conn, "orders", "items") and await table_exists(conn, "order_items"):
+            # order_items jadvaliga yozamiz
+            if await table_exists(conn, "order_items"):
                 material_udt = await column_udt_name(conn, "order_items", "material_id")
                 for item_index, item in enumerate(items):
                     item_values = await filter_existing_fields(conn, "order_items", {
@@ -1319,8 +1324,9 @@ async def create_order(data: OrderCreate, user: dict = Depends(get_current_user)
                         "created_at": now_dt,
                         "updated_at": now_dt,
                     })
-                    isql, iparams = build_insert_statement("order_items", item_values)
-                    await conn.fetchrow(isql, *iparams)
+                    if item_values:
+                        isql, iparams = build_insert_statement("order_items", item_values)
+                        await conn.fetchrow(isql, *iparams)
 
             if await column_exists(conn, "users", "debt"):
                 await conn.execute(
